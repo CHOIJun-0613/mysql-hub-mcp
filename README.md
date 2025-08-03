@@ -119,7 +119,21 @@ uv run run_server.py --mode mcp
 
 ### 2. 클라이언트 실행
 
-#### 대화형 모드 (기본값)
+#### 웹 인터페이스 (권장)
+```bash
+cd client
+uv run run_web_client.py
+```
+웹 브라우저에서 `http://localhost:8501`로 접속하여 사용할 수 있습니다.
+
+**주요 기능:**
+- 🤖 자연어로 데이터베이스 질문
+- ⚡ 직접 SQL 쿼리 실행
+- 📋 데이터베이스 정보 조회
+- 📊 테이블 스키마 확인
+- 📊 결과를 표 형태로 시각화
+
+#### 대화형 모드 (터미널)
 ```bash
 cd client
 uv run run_client.py
@@ -134,7 +148,7 @@ uv run run_client.py --tool natural_language_query --question "사용자 테이�
 #### 배치 모드 - SQL 실행
 ```bash
 cd client
-uv run run_client.py --tool execute_sql --query "SELECT * FROM users"
+uv run run_client.py --tool execute_sql --sql "SELECT * FROM users"
 ```
 
 #### 도구 목록 확인
@@ -154,7 +168,7 @@ uv run mcp_bridge.py --question "사용자 테이블에서 모든 데이터를 �
 
 ### 1. execute_sql
 - **설명**: MySQL 데이터베이스에서 SQL 쿼리를 실행합니다.
-- **매개변수**: `query` (실행할 SQL 쿼리)
+- **매개변수**: `sql` (실행할 SQL 쿼리)
 - **예시**: `SELECT * FROM users WHERE user_name = '홍길동'`
 
 ### 2. natural_language_query
@@ -206,8 +220,32 @@ uv run mcp_bridge.py --question "사용자 테이블에서 모든 데이터를 �
 
 ## 📊 실제 테스트 결과
 
-### 성공적인 자연어 쿼리 예시
+### 성공적인 쿼리 실행 예시
 
+#### 직접 SQL 실행 (권장 방법)
+```sql
+-- 사용자 정보 조회
+SELECT * FROM users ORDER BY id;
+결과: 3명의 사용자 정보 (홍길동, 이순신, 세종대왕)
+
+-- 특정 이메일 사용자 조회
+SELECT user_name, signup_date FROM users WHERE email = 'gildong@example.com';
+결과: 홍길동, 2024-01-15
+
+-- 노트북 주문 사용자 조회
+SELECT u.user_name, u.email FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.product_name LIKE '%노트북%';
+결과: 홍길동, gildong@example.com
+
+-- 가장 비싼 상품 주문자 조회
+SELECT u.user_name, o.product_name, o.amount FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.amount = (SELECT MAX(amount) FROM orders);
+결과: 홍길동, 노트북, 1,500,000원
+
+-- 특정 날짜 이후 주문 상품 조회
+SELECT product_name FROM orders WHERE order_date > '2024-07-05' ORDER BY order_date;
+결과: 집현전 대형 책상, 거북선 모양 USB
+```
+
+#### 자연어 쿼리 실행 (대안 방법)
 ```bash
 # 기본 조회
 질문: "사용자 테이블에서 모든 데이터를 조회해주세요"
@@ -242,6 +280,11 @@ uv run mcp_bridge.py --question "사용자 테이블에서 모든 데이터를 �
 - UTF-8 인코딩 강제 설정
 - 쿼리 유효성 검사
 
+### MCP Bridge 파라미터 수정
+- `execute_sql` 함수의 파라미터명을 `query`에서 `sql`로 수정
+- FastMCP 프레임워크와의 호환성 개선
+- 직접 SQL 실행 기능 안정화
+
 ## 📝 로깅
 
 로그는 다음 위치에 저장됩니다:
@@ -266,6 +309,7 @@ Cursor AI에서 이 MCP 서버를 사용하려면:
 
 1. Cursor AI 설정에서 MCP 서버를 추가
 2. MCP Server 등록
+  ```json
   "mcpServers": {
     "mysql-hub-mcp": {
       "command": "uv",
@@ -279,7 +323,38 @@ Cursor AI에서 이 MCP 서버를 사용하려면:
       ]
     }
   }
+  ```
 3. Cursor AI chat에서 자연어로 데이터베이스 질문 가능
+
+### Cursor Rules 설정
+
+효율적인 SQL 쿼리 실행을 위해 Cursor Rules를 설정하는 것을 권장합니다:
+
+1. `.cursor/rules/` 디렉토리에 `mysql-hub-mcp-rule.mdc` 파일 생성
+2. 다음 규칙 추가:
+
+```markdown
+# MySQL Hub MCP 사용 규칙
+
+## SQL 쿼리 실행 우선순위
+
+### 1단계: 직접 SQL 작성 (권장)
+- `mysql-hub-mcp`를 사용할 때는 즉시 `natural_language_query()`를 호출하지 않음
+- 다음 순서로 진행:
+  1. `get_database_info()` - 데이터베이스 정보 및 테이블 목록 확인
+  2. `get_table_schema(table_name)` - 관련 테이블의 스키마 정보 확인
+  3. 스키마 정보를 바탕으로 직접 SQL 문 작성
+  4. `execute_sql(sql)` - 작성한 SQL 직접 실행
+
+### 2단계: 자연어 쿼리 (대안)
+- 위 방법으로 SQL을 작성할 수 없는 경우에만 `natural_language_query()` 사용
+- 복잡한 쿼리나 스키마 정보만으로는 SQL 작성이 어려운 경우
+
+## 목적
+- 더 빠르고 정확한 SQL 실행
+- 불필요한 자연어 변환 과정 최소화
+- 데이터베이스 구조 이해를 통한 효율적인 쿼리 작성
+```
 
 ## 🛠️ 개발 환경
 
@@ -298,8 +373,9 @@ Cursor AI에서 이 MCP 서버를 사용하려면:
 - **AI/ML**: Groq API, Ollama
 - **통신**: HTTP/HTTPS, MCP Protocol
 - **로깅**: Python logging
-- **UI**: Rich (터미널 UI)
+- **UI**: Rich (터미널 UI), Streamlit (웹 UI)
 - **설정**: python-dotenv
+- **MCP**: FastMCP, Model Context Protocol
 
 ## 📚 참고 문서
 
@@ -307,6 +383,8 @@ Cursor AI에서 이 MCP 서버를 사용하려면:
 - [MCP Quickstart](https://modelcontextprotocol.io/quickstart/server)
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
+- [Cursor AI Documentation](https://cursor.sh/docs)
 
 ## 🤝 기여
 

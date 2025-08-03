@@ -209,3 +209,185 @@ FROM users u;...
 2025-08-03 21:27:43,670 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
 2025-08-03 21:27:45,450 - database - INFO - 쿼리 실행 성공: 5개 행 반환
 2025-08-03 21:27:46,720 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:57:51,802 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:57:51,803 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:57:51,805 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:57:51,808 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:57:51,810 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:58:52,097 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 21:59:10,042 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:59:10,044 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:59:10,047 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:59:10,049 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:59:10,051 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:59:20,003 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 21:59:20,009 - database - INFO - 쿼리 실행 성공: 1개 행 반환
+2025-08-03 22:00:34,122 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:00:34,123 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:00:35,861 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:00:37,280 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:15:41,374 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 22:15:41,377 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 22:15:47,230 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 22:15:47,230 - server_app - INFO - 실행 모드: http
+2025-08-03 22:15:47,231 - server_app - INFO - AI Provider: ollama
+2025-08-03 22:15:47,232 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 22:15:47,245 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 22:16:04,383 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:16:04,386 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:16:04,390 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:16:04,394 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:16:04,397 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:17:04,709 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 22:18:47,843 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:18:47,844 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:18:47,846 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:18:47,848 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:18:47,851 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:18:56,521 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:18:56,527 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:19:46,211 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:19:46,213 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:19:46,217 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:19:46,220 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:19:46,224 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:19:54,828 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:19:54,833 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:20:23,904 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:20:23,905 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:20:23,910 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:20:23,916 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:20:23,921 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:20:32,241 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:20:32,246 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:22:58,737 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:23:09,435 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:23:09,436 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:29:00,331 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:29:00,333 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:29:52,081 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:29:52,084 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:29:52,087 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:29:52,092 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:29:52,096 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:30:34,268 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:30:34,270 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:30:34,277 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:30:34,284 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:30:34,292 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:30:52,547 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 22:30:59,801 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:30:59,805 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:31:37,705 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:31:37,706 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:31:44,945 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:32:09,729 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:32:09,730 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:32:31,556 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:32:31,557 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:32:31,561 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:32:31,566 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:32:31,569 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:32:33,122 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:32:33,127 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:36:14,431 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:36:14,433 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:40:02,252 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:40:02,253 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:40:25,211 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:40:25,212 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:40:25,217 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:40:25,224 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:40:25,230 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:41:25,551 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 22:42:44,142 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:42:44,144 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:42:53,160 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:46:19,110 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 22:46:19,113 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 22:46:24,847 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 22:46:24,847 - server_app - INFO - 실행 모드: http
+2025-08-03 22:46:24,847 - server_app - INFO - AI Provider: ollama
+2025-08-03 22:46:24,848 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 22:46:24,865 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 22:46:48,415 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:46:48,417 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:47:08,737 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:47:08,738 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:47:08,741 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:47:08,745 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:47:08,749 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:48:28,747 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:48:28,755 - database - INFO - 쿼리 실행 성공: 1개 행 반환
+2025-08-03 22:49:36,184 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:49:36,185 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:49:40,964 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:49:54,475 - database - WARNING - 쿼리 유효성 검사 실패: (pymysql.err.ProgrammingError) (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'order' at line 1")
+[SQL: EXPLAIN select * from order]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-08-03 22:50:04,670 - database - WARNING - 쿼리 유효성 검사 실패: (pymysql.err.ProgrammingError) (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'order' at line 1")
+[SQL: EXPLAIN select * from order;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-08-03 22:53:25,501 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:53:35,866 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:57:12,518 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 22:57:12,521 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 22:57:20,307 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 22:57:20,307 - server_app - INFO - 실행 모드: http
+2025-08-03 22:57:20,308 - server_app - INFO - AI Provider: ollama
+2025-08-03 22:57:20,309 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 22:57:20,318 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 22:57:30,460 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:57:30,462 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:57:47,614 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:57:47,615 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:57:47,619 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:57:47,621 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:57:47,624 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:59:06,556 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:59:06,567 - database - INFO - 쿼리 실행 성공: 1개 행 반환
+2025-08-03 22:59:34,182 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 22:59:34,184 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 22:59:34,187 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:59:34,190 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 22:59:34,193 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 22:59:48,291 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 22:59:48,297 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:00:21,184 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:00:27,858 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:00:27,859 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:00:32,759 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 23:01:10,101 - database - WARNING - 쿼리 유효성 검사 실패: (pymysql.err.OperationalError) (1109, "Unknown table 'u' in field list")
+[SQL: EXPLAIN SELECT u.user_name, SUM(o.amount) AS total_order_amount]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-08-03 23:01:30,361 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:01:30,362 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:01:30,364 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:01:30,366 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:01:30,369 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 23:01:36,988 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 23:01:36,992 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:01:59,252 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:01:59,253 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:01:59,256 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:01:59,260 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:01:59,263 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 23:02:10,994 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 23:02:10,999 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:02:34,081 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:02:34,082 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:02:42,030 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:03:55,225 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:03:55,226 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:03:56,566 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:04:35,206 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 23:04:35,206 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 23:04:36,357 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 23:04:37,691 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 23:05:57,320 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 23:05:57,321 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 23:12:21,453 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 23:12:21,453 - server_app - INFO - 실행 모드: http
+2025-08-03 23:12:21,453 - server_app - INFO - AI Provider: ollama
+2025-08-03 23:12:21,455 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 23:12:21,464 - http_server - INFO - HTTP 서버가 시작되었습니다.

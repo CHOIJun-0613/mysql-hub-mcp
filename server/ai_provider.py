@@ -51,17 +51,32 @@ class GroqProvider(AIProvider):
             return "Groq 클라이언트가 초기화되지 않았습니다."
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                temperature=0.1
-            )
+            import httpx
             
-            return response.choices[0].message.content
+            # httpx를 사용하여 timeout 설정
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {config.GROQ_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": "당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 1000,
+                        "temperature": 0.1
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    return f"Groq API 오류: {response.status_code} - {response.text}"
         except Exception as e:
             logger.error(f"Groq 응답 생성 실패: {e}")
             return f"응답 생성 중 오류가 발생했습니다: {e}"
@@ -130,7 +145,7 @@ class OllamaProvider(AIProvider):
                     f"{self.url}/api/generate",
                     json=payload,
                     headers={"Content-Type": "application/json"},
-                    timeout=60.0  # 타임아웃을 60초로 증가
+                    timeout=180.0  # 타임아웃을 180초로 설정
                 )
                 
                 logger.debug(f"Ollama API 응답 상태: {response.status_code}")

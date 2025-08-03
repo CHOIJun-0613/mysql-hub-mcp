@@ -143,7 +143,20 @@ async def execute_sql(request: SQLQueryRequest):
         
         # 쿼리 유효성 검사
         if not db_manager.validate_query(request.query):
-            raise HTTPException(status_code=400, detail="잘못된 SQL 쿼리입니다.")
+            # 더 자세한 오류 메시지 제공
+            error_detail = "잘못된 SQL 쿼리입니다."
+            
+            # 예약어 관련 오류인지 확인
+            query_lower = request.query.lower()
+            reserved_words = ['order', 'group', 'select', 'from', 'where', 'having', 'limit', 'offset']
+            
+            for word in reserved_words:
+                if f" {word} " in query_lower or query_lower.startswith(word + " ") or query_lower.endswith(" " + word):
+                    if word in ['order', 'group']:
+                        error_detail = f"'{word}'는 MySQL 예약어입니다. 백틱(`)으로 감싸주세요. 예: `{word}`"
+                    break
+            
+            raise HTTPException(status_code=400, detail=error_detail)
         
         # 쿼리 실행
         if request.query.strip().upper().startswith('SELECT'):

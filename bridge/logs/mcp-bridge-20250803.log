@@ -102,3 +102,9 @@
 2025-08-03 21:27:45,434 - mcp-bridge - INFO - get_table_schema 호출됨: orders
 2025-08-03 21:27:46,698 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
 2025-08-03 21:27:46,698 - mcp-bridge - INFO - get_table_schema 호출됨: users
+2025-08-03 22:00:34,104 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-08-03 22:00:34,105 - mcp-bridge - INFO - get_database_info 호출됨
+2025-08-03 22:00:35,844 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-08-03 22:00:35,845 - mcp-bridge - INFO - get_table_schema 호출됨: users
+2025-08-03 22:00:37,262 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-08-03 22:00:37,263 - mcp-bridge - INFO - get_table_schema 호출됨: orders
