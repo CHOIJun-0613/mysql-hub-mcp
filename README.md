@@ -265,7 +265,20 @@ uv run mcp_bridge.py --question "사용자 테이블에서 모든 데이터를 �
 Cursor AI에서 이 MCP 서버를 사용하려면:
 
 1. Cursor AI 설정에서 MCP 서버를 추가
-2. 서버 경로: `python /path/to/mysql-hub-mcp/server/run_server.py --mode mcp`
+2. MCP Server 등록
+  "mcpServers": {
+    "mysql-hub-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:\\workspaces\\mcp-work\\mysql-hub-mcp\\bridge",
+        "run",
+        "mcp_bridge.py",
+        "--url",
+        "http://localhost:8000"
+      ]
+    }
+  }
 3. Cursor AI chat에서 자연어로 데이터베이스 질문 가능
 
 ## 🛠️ 개발 환경
