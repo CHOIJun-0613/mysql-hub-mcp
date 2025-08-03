@@ -1,0 +1,211 @@
+2025-08-03 20:18:05,867 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 20:18:05,868 - server_app - INFO - 실행 모드: http
+2025-08-03 20:18:05,868 - server_app - INFO - AI Provider: ollama
+2025-08-03 20:18:05,868 - asyncio - DEBUG - Using proactor: IocpProactor
+2025-08-03 20:18:05,869 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 20:18:05,886 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 20:28:47,878 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 20:28:47,879 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 20:29:02,784 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 20:29:02,787 - server_app - INFO - 실행 모드: http
+2025-08-03 20:29:02,787 - server_app - INFO - AI Provider: ollama
+2025-08-03 20:29:02,788 - asyncio - DEBUG - Using proactor: IocpProactor
+2025-08-03 20:29:02,789 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 20:29:02,799 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 20:29:34,099 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:29:34,101 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:29:34,104 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:29:34,107 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:29:34,110 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:29:34,111 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:29:34,111 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:29:34,112 - ai_provider - DEBUG - 프롬프트 길이: 1157
+2025-08-03 20:29:34,129 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:29:34,384 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47BD4C70>
+2025-08-03 20:29:34,384 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:29:34,384 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:29:34,385 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:29:34,385 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:29:34,386 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:30:34,389 - httpcore.http11 - DEBUG - receive_response_headers.failed exception=ReadTimeout(TimeoutError())
+2025-08-03 20:30:38,685 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:30:38,686 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:30:38,687 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 20:30:55,386 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:30:55,388 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:30:55,391 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:30:55,394 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:30:55,396 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:30:55,397 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:30:55,397 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:30:55,397 - ai_provider - DEBUG - 프롬프트 길이: 1157
+2025-08-03 20:30:55,412 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:30:55,666 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47BD5540>
+2025-08-03 20:30:55,666 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:30:55,667 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:30:55,668 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:30:55,669 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:30:55,669 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:31:00,255 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Sun, 03 Aug 2025 11:31:00 GMT'), (b'Transfer-Encoding', b'chunked')])
+2025-08-03 20:31:00,255 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 20:31:00,256 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-08-03 20:31:00,256 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-08-03 20:31:00,257 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:31:00,257 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:31:00,257 - ai_provider - DEBUG - Ollama API 응답 상태: 200
+2025-08-03 20:31:00,258 - ai_provider - DEBUG - Ollama 응답 (정리됨): SELECT u.id, u.user_name, u.email, u.signup_date
+FROM users u;...
+2025-08-03 20:31:00,258 - httpcore.connection - DEBUG - close.started
+2025-08-03 20:31:00,258 - httpcore.connection - DEBUG - close.complete
+2025-08-03 20:31:00,265 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:34:11,633 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:34:11,634 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:34:12,683 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:34:16,848 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:34:16,849 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:34:16,851 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:34:16,853 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:34:16,855 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:34:16,856 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:34:16,856 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:34:16,856 - ai_provider - DEBUG - 프롬프트 길이: 1159
+2025-08-03 20:34:16,867 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:34:17,133 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47BD52D0>
+2025-08-03 20:34:17,133 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:34:17,133 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:34:17,134 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:34:17,135 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:34:17,135 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:34:24,671 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Sun, 03 Aug 2025 11:34:24 GMT'), (b'Transfer-Encoding', b'chunked')])
+2025-08-03 20:34:24,671 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 20:34:24,671 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-08-03 20:34:24,672 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-08-03 20:34:24,673 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:34:24,673 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:34:24,674 - ai_provider - DEBUG - Ollama API 응답 상태: 200
+2025-08-03 20:34:24,674 - ai_provider - DEBUG - Ollama 응답 (정리됨): SELECT * FROM users;...
+2025-08-03 20:34:24,675 - httpcore.connection - DEBUG - close.started
+2025-08-03 20:34:24,675 - httpcore.connection - DEBUG - close.complete
+2025-08-03 20:34:24,678 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:38:11,543 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:38:11,544 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:38:11,547 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:38:11,550 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:38:11,553 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:38:11,554 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:38:11,554 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:38:11,554 - ai_provider - DEBUG - 프롬프트 길이: 1170
+2025-08-03 20:38:11,564 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:38:11,814 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47BD72B0>
+2025-08-03 20:38:11,815 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:38:11,816 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:38:11,816 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:38:11,816 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:38:11,817 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:38:20,396 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Sun, 03 Aug 2025 11:38:20 GMT'), (b'Transfer-Encoding', b'chunked')])
+2025-08-03 20:38:20,397 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 20:38:20,397 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-08-03 20:38:20,397 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-08-03 20:38:20,397 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:38:20,397 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:38:20,398 - ai_provider - DEBUG - Ollama API 응답 상태: 200
+2025-08-03 20:38:20,398 - ai_provider - DEBUG - Ollama 응답 (정리됨): SELECT * FROM users ORDER BY id;...
+2025-08-03 20:38:20,399 - httpcore.connection - DEBUG - close.started
+2025-08-03 20:38:20,400 - httpcore.connection - DEBUG - close.complete
+2025-08-03 20:38:20,402 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:38:55,329 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:38:55,330 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:38:55,333 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:38:55,335 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:38:55,337 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:38:55,338 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:38:55,338 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:38:55,338 - ai_provider - DEBUG - 프롬프트 길이: 1170
+2025-08-03 20:38:55,350 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:38:55,607 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47BECA00>
+2025-08-03 20:38:55,608 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:38:55,609 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:38:55,609 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:38:55,610 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:38:55,610 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:38:57,351 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Sun, 03 Aug 2025 11:38:57 GMT'), (b'Transfer-Encoding', b'chunked')])
+2025-08-03 20:38:57,351 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 20:38:57,352 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-08-03 20:38:57,352 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-08-03 20:38:57,352 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:38:57,352 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:38:57,352 - ai_provider - DEBUG - Ollama API 응답 상태: 200
+2025-08-03 20:38:57,353 - ai_provider - DEBUG - Ollama 응답 (정리됨): SELECT * FROM users ORDER BY id;...
+2025-08-03 20:38:57,353 - httpcore.connection - DEBUG - close.started
+2025-08-03 20:38:57,354 - httpcore.connection - DEBUG - close.complete
+2025-08-03 20:38:57,355 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:41:58,358 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:41:58,359 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 20:41:58,362 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:41:58,365 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 20:41:58,367 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 20:41:58,368 - ai_provider - DEBUG - Ollama API 호출 시작: http://localhost:11434/api/generate
+2025-08-03 20:41:58,368 - ai_provider - DEBUG - 모델: llama3:8b
+2025-08-03 20:41:58,369 - ai_provider - DEBUG - 프롬프트 길이: 1176
+2025-08-03 20:41:58,381 - httpcore.connection - DEBUG - connect_tcp.started host='localhost' port=11434 local_address=None timeout=60.0 socket_options=None
+2025-08-03 20:41:58,639 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000015F47B83A60>
+2025-08-03 20:41:58,640 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2025-08-03 20:41:58,641 - httpcore.http11 - DEBUG - send_request_headers.complete
+2025-08-03 20:41:58,641 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2025-08-03 20:41:58,641 - httpcore.http11 - DEBUG - send_request_body.complete
+2025-08-03 20:41:58,641 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2025-08-03 20:42:07,552 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=utf-8'), (b'Date', b'Sun, 03 Aug 2025 11:42:07 GMT'), (b'Transfer-Encoding', b'chunked')])
+2025-08-03 20:42:07,553 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 20:42:07,553 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2025-08-03 20:42:07,553 - httpcore.http11 - DEBUG - receive_response_body.complete
+2025-08-03 20:42:07,553 - httpcore.http11 - DEBUG - response_closed.started
+2025-08-03 20:42:07,554 - httpcore.http11 - DEBUG - response_closed.complete
+2025-08-03 20:42:07,554 - ai_provider - DEBUG - Ollama API 응답 상태: 200
+2025-08-03 20:42:07,555 - ai_provider - DEBUG - Ollama 응답 (정리됨): SELECT * FROM users ORDER BY id;...
+2025-08-03 20:42:07,555 - httpcore.connection - DEBUG - close.started
+2025-08-03 20:42:07,555 - httpcore.connection - DEBUG - close.complete
+2025-08-03 20:42:07,559 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 20:45:55,464 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:18:32,068 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:18:32,069 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:18:33,229 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:19:19,688 - server_app - INFO - 서버가 종료되었습니다.
+2025-08-03 21:19:19,692 - server_app - INFO - 사용자에 의해 서버가 중단되었습니다.
+2025-08-03 21:20:01,779 - server_app - INFO - MySQL Hub MCP Server를 시작합니다.
+2025-08-03 21:20:01,779 - server_app - INFO - 실행 모드: http
+2025-08-03 21:20:01,780 - server_app - INFO - AI Provider: ollama
+2025-08-03 21:20:01,780 - server_app - INFO - HTTP 서버만 시작합니다.
+2025-08-03 21:20:01,791 - http_server - INFO - HTTP 서버가 시작되었습니다.
+2025-08-03 21:20:17,153 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:20:17,154 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:20:17,157 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:20:17,159 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:20:17,162 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:21:03,034 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:21:03,046 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:21:04,793 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:21:17,453 - ai_provider - ERROR - Ollama API 호출 시간 초과
+2025-08-03 21:21:31,582 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:21:31,583 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:21:31,586 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:21:31,589 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:21:31,592 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:21:42,699 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 21:21:42,703 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:22:38,861 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:22:38,863 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:22:40,335 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:24:55,062 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:24:55,063 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:24:56,068 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:25:56,999 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:25:56,999 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:25:57,001 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:25:57,004 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:25:57,007 - database - INFO - 쿼리 실행 성공: 4개 행 반환
+2025-08-03 21:26:13,364 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-08-03 21:26:13,369 - database - INFO - 쿼리 실행 성공: 1개 행 반환
+2025-08-03 21:27:43,669 - database - INFO - 쿼리 실행 성공: 3개 행 반환
+2025-08-03 21:27:43,670 - database - INFO - 테이블 목록 조회 성공: 3개 테이블
+2025-08-03 21:27:45,450 - database - INFO - 쿼리 실행 성공: 5개 행 반환
+2025-08-03 21:27:46,720 - database - INFO - 쿼리 실행 성공: 4개 행 반환
