@@ -19,6 +19,10 @@ wheels/
 # Log files
 *.log
 logs/
+server/logs/
+client/logs/
+bridge/logs/
+*.log.*
 
 # IDE files
 .vscode/
