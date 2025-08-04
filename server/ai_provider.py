@@ -78,6 +78,11 @@ class GroqProvider(AIProvider):
 - 문법적으로 잘못되어 있는 경우
 - 의미없는 문장으로 되어 있는 경우우
 - 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
+7. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
+- MySQL doesn't yet support
+- 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
+- 잘못된 예시: SELECT *  FROM users WHERE id IN ( SELECT user_id FROM orders ORDER BY order_date DESC LIMIT 1);
+- 올바른 예시: SELECT u.* FROM users u JOIN orders o ON u.id = o.user_id ORDER BY o.order_date DESC LIMIT 1;
 
 == 예시 ==
 예시 올바른 응답:
@@ -148,6 +153,11 @@ class OllamaProvider(AIProvider):
 - 문법적으로 잘못되어 있는 경우
 - 의미없는 문장으로 되어 있는 경우우
 - 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
+7. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
+- MySQL doesn't yet support
+- 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
+- 잘못된 예시: SELECT *  FROM users WHERE id IN ( SELECT user_id FROM orders ORDER BY order_date DESC LIMIT 1);
+- 올바른 예시: SELECT u.* FROM users u JOIN orders o ON u.id = o.user_id ORDER BY o.order_date DESC LIMIT 1;
 
 == 예시 ==
 예시 올바른 응답:
