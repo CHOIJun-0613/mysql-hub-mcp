@@ -64,7 +64,33 @@ class GroqProvider(AIProvider):
                     json={
                         "model": self.model,
                         "messages": [
-                            {"role": "system", "content": "당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요."},
+                            {"role": "system", "content": """당신은 MySQL 데이터베이스 쿼리 전문가입니다. 
+
+⚠️ 매우 중요한 규칙:
+1. 순수한 SQL 쿼리만 반환하세요
+2. 마크다운 형식(```)을 절대 사용하지 마세요
+3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
+4. 쿼리 1개만 반환하세요
+5. 세미콜론(;)으로 끝내세요
+6. 질문이 모호하거나 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
+- 문장구성이 안되어 있는 경우
+- 불완전하거나 뜻이 모호한 경우
+- 문법적으로 잘못되어 있는 경우
+- 의미없는 문장으로 되어 있는 경우우
+- 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
+
+== 예시 ==
+예시 올바른 응답:
+SELECT * FROM users;
+
+예시 잘못된 응답:
+```sql
+SELECT * FROM users;
+```
+또는
+SELECT * FROM users;
+### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
+"""},
                             {"role": "user", "content": prompt}
                         ],
                         "max_tokens": 1000,
@@ -108,7 +134,33 @@ class OllamaProvider(AIProvider):
             
             # 메시지를 프롬프트로 변환
             messages = [
-                {"role": "system", "content": "당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요."},
+                {"role": "system", "content": """당신은 MySQL 데이터베이스 쿼리 전문가입니다. 
+
+⚠️ 매우 중요한 규칙:
+1. 순수한 SQL 쿼리만 반환하세요
+2. 마크다운 형식(```)을 절대 사용하지 마세요
+3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
+4. 쿼리 1개만 반환하세요
+5. 세미콜론(;)으로 끝내세요
+6. 질문이 모호하거나 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
+- 문장구성이 안되어 있는 경우
+- 불완전하거나 뜻이 모호한 경우
+- 문법적으로 잘못되어 있는 경우
+- 의미없는 문장으로 되어 있는 경우우
+- 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
+
+== 예시 ==
+예시 올바른 응답:
+SELECT * FROM users;
+
+예시 잘못된 응답:
+```sql
+SELECT * FROM users;
+```
+또는
+SELECT * FROM users;
+### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
+"""},
                 {"role": "user", "content": prompt}
             ]
             
@@ -166,8 +218,6 @@ class OllamaProvider(AIProvider):
                         # 제어 문자 제거
                         import re
                         response_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', response_text)
-                        
-                        logger.debug(f"Ollama 응답 (정리됨): {response_text[:200]}...")
                         return response_text
                     except Exception as e:
                         logger.error(f"응답 텍스트 정리 중 오류: {e}")
@@ -205,7 +255,8 @@ class OllamaProvider(AIProvider):
                             data = response.json()
                             models = data.get("models", [])
                             available_models = [model.get("name", "") for model in models]
-                            logger.info(f"사용 가능한 Ollama 모델: {available_models}")
+                            logger.info(f"사용 가능한 Ollama 모델[{self.model}]: {available_models}")
+                           
                             if self.model in available_models:
                                 return True
                             else:
@@ -220,18 +271,20 @@ class OllamaProvider(AIProvider):
             
             # 동기적으로 실행
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(test_connection())
-                return result
+                # 현재 이벤트 루프가 있는지 확인
+                try:
+                    loop = asyncio.get_running_loop()
+                    # 이미 실행 중인 루프가 있으면 새 스레드에서 실행
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, test_connection())
+                        return future.result()
+                except RuntimeError:
+                    # 실행 중인 루프가 없으면 직접 실행
+                    return asyncio.run(test_connection())
             except Exception as e:
                 logger.error(f"이벤트 루프 실행 오류: {e}")
                 return False
-            finally:
-                try:
-                    loop.close()
-                except:
-                    pass
                 
         except Exception as e:
             logger.error(f"Ollama 연결 테스트 실패: {e}")

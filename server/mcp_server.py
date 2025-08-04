@@ -172,17 +172,19 @@ class MySQLMCPServer:
             
             # AI에게 전달할 프롬프트 구성
             schema_info = ""
-            for table_name in db_info.get("tables", [])[:5]:  # 처음 5개 테이블만
+            # 모든 테이블의 스키마 정보를 포함하도록 수정
+            for table_name in db_info.get("tables", []):
                 try:
                     schema = db_manager.get_table_schema(table_name)
                     schema_info += f"\n테이블: {table_name}\n"
                     for col in schema:
                         schema_info += f"  - {col['COLUMN_NAME']} ({col['DATA_TYPE']})\n"
-                except:
+                except Exception:
                     continue
-            
             prompt = f"""
 다음 데이터베이스 스키마를 참고하여 자연어 질문을 SQL 쿼리로 변환해주세요.
+SQL은 가장 정확하다고 판단되는 쿼리 1개만 반환해주세요.
+SQL 쿼리만 반환해주세요. 설명이나 코멘트는 포함하지 마세요.
 
 데이터베이스: {db_info.get('database_name', 'unknown')}
 스키마 정보:
@@ -190,7 +192,6 @@ class MySQLMCPServer:
 
 질문: {question}
 
-SQL 쿼리만 반환해주세요. 설명은 포함하지 마세요.
 """
             
             # AI를 사용하여 SQL 생성

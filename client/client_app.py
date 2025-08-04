@@ -132,6 +132,13 @@ class HTTPMCPClient:
         """서버 응답을 보기 좋게 포맷합니다."""
         try:
             data = resp.json()
+            
+            # HTTPException 처리 (400, 500 등 에러 상태 코드)
+            if resp.status_code >= 400:
+                error_detail = data.get("detail", "알 수 없는 오류")
+                return Panel(f"상태 코드: {resp.status_code}\n오류: {error_detail}", title="[red]HTTP 오류[/red]", border_style="red")
+            
+            # 정상 응답 처리
             if data.get("success"):
                 return Panel(str(data.get("data")), title="[green]성공[/green]", border_style="green")
             else:

@@ -129,6 +129,7 @@ async def get_database_info():
     """데이터베이스 정보를 반환합니다."""
     try:
         info = db_manager.get_database_info()
+        logger.debug(f"데이터베이스 정보 조회 결과: {info}")
         return Response(success=True, data=info)
     except Exception as e:
         logger.error(f"데이터베이스 정보 조회 실패: {e}")
@@ -165,6 +166,7 @@ async def execute_sql(request: SQLQueryRequest):
             affected_rows = db_manager.execute_non_query(request.query)
             result = {"affected_rows": affected_rows}
         
+        logger.debug(f"SQL 실행 결과: {result}")
         return Response(success=True, data=result)
         
     except HTTPException:
@@ -179,7 +181,9 @@ async def natural_language_query(request: NaturalLanguageRequest):
     try:
         if not request.question:
             raise HTTPException(status_code=400, detail="질문이 제공되지 않았습니다.")
-        
+        # 질문이 수자로만 되어 있거나 글자수가 5 미만인 경우 예외 처리
+        if request.question.isdigit() or len(request.question.strip()) < 5:
+            raise HTTPException(status_code=400, detail="질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
         # 데이터베이스 스키마 정보 가져오기
         db_info = db_manager.get_database_info()
         if "error" in db_info:
@@ -194,7 +198,8 @@ async def natural_language_query(request: NaturalLanguageRequest):
                          not table.startswith('performance_schema') and
                          not table.startswith('sys')]
         
-        for table_name in user_tables[:5]:  # 최대 5개 테이블만 사용
+        # 모든 사용자 테이블의 스키마 정보를 사용
+        for table_name in user_tables:
             try:
                 schema = db_manager.get_table_schema(table_name)
                 schema_info += f"\n테이블: {table_name}\n"
@@ -211,37 +216,45 @@ async def natural_language_query(request: NaturalLanguageRequest):
                 continue
         
         prompt = f"""
-다음 데이터베이스 스키마를 분석하고 자연어 질문을 SQL 쿼리로 변환해주세요.
+당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요.
+
+⚠️ 매우 중요한 규칙:
+1. 순수한 SQL 쿼리만 반환하세요
+2. 마크다운 형식(```)을 절대 사용하지 마세요
+3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
+4. 쿼리 1개만 반환하세요
+5. 세미콜론(;)으로 끝내세요
+
+예시 올바른 응답:
+SELECT * FROM users;
+
+예시 잘못된 응답:
+```sql
+SELECT * FROM users;
+```
+또는
+SELECT * FROM users;
+### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
+
+=== 추가 정보 ===
+MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
+-해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
+예시:
+SELECT * FROM (SELECT * FROM UserInfo WHERE CreateDate >= '2010-01-01' LIMIT 0,10) AS temp_tbl;
 
 데이터베이스: {db_info.get('database_name', 'unknown')}
 
 === 테이블 스키마 정보 ===
 {schema_info}
 
-=== 분석 단계 ===
-1. 먼저 각 테이블의 구조와 컬럼을 분석하세요
-2. 테이블 간의 관계를 파악하세요 (외래키, JOIN 가능한 컬럼)
-3. 질문에서 필요한 정보가 어떤 테이블에 있는지 확인하세요
-4. 질문에서 언급된 조건(상품명, 날짜, 금액 등)을 WHERE 절에 반드시 포함하세요
-5. 적절한 JOIN과 WHERE 조건을 결정하세요
-6. 중복 제거가 필요한 경우 DISTINCT를 사용하세요
-
-=== 주의사항 ===
-- [바이너리 데이터]로 표시된 컬럼은 바이너리 타입입니다
-- 바이너리 컬럼은 HEX() 함수를 사용하여 16진수 문자열로 변환할 수 있습니다
-- orders 테이블에는 이미 product_name 컬럼이 포함되어 있습니다
-- post 테이블은 게시물 정보를 담고 있으며, orders와 직접적인 관련이 없습니다
-- 테이블 간 관계를 정확히 파악하여 JOIN을 사용하세요
-- 질문에서 언급된 상품명, 날짜, 금액 등의 조건은 반드시 WHERE 절에 포함해야 합니다
-- 예: "노트북을 주문한" → WHERE o.product_name = '노트북'
-
 === 질문 ===
 {request.question}
 
-SQL 쿼리만 반환해주세요. 설명은 포함하지 마세요.
-마크다운 형식(```)을 사용하지 말고 순수한 SQL 쿼리만 반환하세요.
+이제 위 질문에 대한 SQL 쿼리만 반환하세요:
 """
-        
+       
+        logger.info(f"자연어 쿼리: \n\n[{request.question}]\n")
+        logger.debug(f"자연어 쿼리 프롬프트: \n{prompt}\n")
         # AI를 사용하여 SQL 생성
         sql_query = await ai_manager.generate_response(prompt)
         
@@ -252,18 +265,37 @@ SQL 쿼리만 반환해주세요. 설명은 포함하지 마세요.
                 error="AI 응답이 없습니다."
             )
         
-        # 마크다운 코드 블록 제거
+        # 마크다운 코드 블록 및 추가 텍스트 제거
         sql_query = sql_query.strip()
+        
+        # 마크다운 코드 블록 제거
         if sql_query.startswith("```"):
             # 첫 번째 ``` 제거
             sql_query = sql_query[3:]
-            # 언어 식별자 제거 (예: ```sql)
+            # 언어 식별자 제거 (예: ```sql, ```, ```mysql)
             if sql_query.startswith("sql"):
                 sql_query = sql_query[3:]
+            elif sql_query.startswith("mysql"):
+                sql_query = sql_query[5:]
             # 마지막 ``` 제거
             if sql_query.endswith("```"):
                 sql_query = sql_query[:-3]
             sql_query = sql_query.strip()
+        
+        # 설명 텍스트 제거 (###, ##, #, 설명:, 설명 등)
+        import re
+        # ###, ##, # 로 시작하는 라인 제거
+        sql_query = re.sub(r'^#+\s*.*$', '', sql_query, flags=re.MULTILINE)
+        # 설명:, 설명, ### 설명 등 제거
+        sql_query = re.sub(r'^.*(설명|결과|분석|최종).*$', '', sql_query, flags=re.MULTILINE | re.IGNORECASE)
+        # 빈 줄 제거
+        sql_query = re.sub(r'\n\s*\n', '\n', sql_query)
+        # 앞뒤 공백 제거
+        sql_query = sql_query.strip()
+        
+        # 첫 번째 SQL 문장만 추출 (세미콜론까지)
+        if ';' in sql_query:
+            sql_query = sql_query[:sql_query.find(';')+1]
         
         # 오류 메시지인지 확인
         error_keywords = [
@@ -284,21 +316,44 @@ SQL 쿼리만 반환해주세요. 설명은 포함하지 마세요.
                 success=False,
                 error=f"유효하지 않은 SQL 쿼리: {sql_query}"
             )
+        # SQL 쿼리 pretty 포맷 적용 
+        import sqlparse
+        try:
+            pretty_sql = sqlparse.format(
+                sql_query, 
+                reindent_aligned=True, 
+                use_space_around_operators=True,
+                indent_width=2,
+                keyword_case='upper',
+                output_format='sql'
+            )
+
+
+        except Exception as e:
+            logger.warning(f"sqlparse 포매팅 실패: {e}")
+            pretty_sql = sql_query
         
+        logger.info(f"AI 생성 SQL :\n\n{pretty_sql}\n")
+
         # SQL 쿼리 실행
         try:
+            sql_query = pretty_sql
             result = db_manager.execute_query(sql_query)
+            response_data = {
+                "generated_sql": sql_query,
+                "result": result
+            }
+            logger.info(f"자연어 쿼리 실행 결과: \n\n{response_data}\n")
             return Response(
                 success=True,
-                data={
-                    "generated_sql": sql_query,
-                    "result": result
-                }
+                data=response_data
             )
         except Exception as e:
+            error_data = {"generated_sql": sql_query}
+            logger.debug(f"자연어 쿼리 실행 오류 데이터: {error_data}")
             return Response(
                 success=False,
-                data={"generated_sql": sql_query},
+                data=error_data,
                 error=f"SQL 실행 오류: {e}"
             )
         
@@ -313,6 +368,7 @@ async def get_table_list():
     """테이블 목록을 반환합니다."""
     try:
         tables = db_manager.get_table_list()
+        logger.debug(f"테이블 목록 조회 결과: {tables}")
         return Response(success=True, data=tables)
     except Exception as e:
         logger.error(f"테이블 목록 조회 실패: {e}")
@@ -326,6 +382,7 @@ async def get_table_schema(request: TableSchemaRequest):
             raise HTTPException(status_code=400, detail="테이블 이름이 제공되지 않았습니다.")
         
         schema = db_manager.get_table_schema(request.table_name)
+        logger.debug(f"테이블 스키마 조회 결과: {schema}")
         return Response(success=True, data=schema)
         
     except HTTPException:
@@ -339,7 +396,9 @@ async def get_current_ai_provider():
     """현재 AI Provider 정보를 반환합니다."""
     try:
         provider = ai_manager.get_current_provider()
-        return Response(success=True, data={"provider": provider})
+        provider_data = {"provider": provider}
+        logger.debug(f"AI Provider 정보 조회 결과: {provider_data}")
+        return Response(success=True, data=provider_data)
     except Exception as e:
         logger.error(f"AI Provider 정보 조회 실패: {e}")
         return Response(success=False, error=str(e))
@@ -350,11 +409,14 @@ async def switch_ai_provider(request: AIProviderRequest):
     try:
         success = ai_manager.switch_provider(request.provider)
         if success:
+            provider_data = {"provider": ai_manager.get_current_provider()}
+            logger.debug(f"AI Provider 전환 성공 결과: {provider_data}")
             return Response(
                 success=True,
-                data={"provider": ai_manager.get_current_provider()}
+                data=provider_data
             )
         else:
+            logger.debug(f"AI Provider 전환 실패: {request.provider}")
             return Response(
                 success=False,
                 error=f"Provider 전환 실패: {request.provider}"

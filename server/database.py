@@ -74,7 +74,18 @@ class DatabaseManager:
                     for col, value in zip(columns, row):
                         cleaned_row[col] = self._clean_value(value)
                     rows.append(cleaned_row)
-                
+                # 1~100번째 행만 출력, 101번째는 '...' 출력
+                logger.debug("쿼리 실행 결과: \n")
+                max_log_rows = 100
+                for idx, row in enumerate(rows):
+                    if idx < max_log_rows:
+                        if(idx < len(rows) - 1):
+                            logger.debug(f"[{idx+1:03}] {row}")
+                        else:
+                            logger.debug(f"[{idx+1:03}] {row}\n")
+                    elif idx == max_log_rows:
+                        logger.debug(f"[{idx+1:03}] ...(이하 생략)\n")
+                        break
                 logger.info(f"쿼리 실행 성공: {len(rows)}개 행 반환")
                 return rows
                 
