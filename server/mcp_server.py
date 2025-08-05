@@ -82,6 +82,14 @@ class MySQLMCPServer:
                     }
                 ),
                 Tool(
+                    name="get_table_list",
+                    description="데이터베이스의 모든 테이블 목록을 반환합니다.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
+                    }
+                ),
+                Tool(
                     name="get_table_schema",
                     description="특정 테이블의 스키마 정보를 반환합니다.",
                     inputSchema={
@@ -108,6 +116,8 @@ class MySQLMCPServer:
                     return await self._natural_language_query(arguments)
                 elif name == "get_database_info":
                     return await self._get_database_info(arguments)
+                elif name == "get_table_list":
+                    return await self._get_table_list(arguments)
                 elif name == "get_table_schema":
                     return await self._get_table_schema(arguments)
                 else:
@@ -163,52 +173,145 @@ class MySQLMCPServer:
             )
         
         try:
-            # 데이터베이스 스키마 정보 가져오기
-            db_info = db_manager.get_database_info()
-            if "error" in db_info:
-                return CallToolResult(
-                    content=[TextContent(type="text", text=f"데이터베이스 연결 오류: {db_info['error']}")]
-                )
+            # Tool 정의
+            tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_database_info",
+                        "description": "데이터베이스 정보와 테이블 목록을 반환합니다.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_list",
+                        "description": "데이터베이스의 모든 테이블 목록을 반환합니다.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {}
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_schema",
+                        "description": "특정 테이블의 스키마 정보를 반환합니다.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "table_name": {
+                                    "type": "string",
+                                    "description": "테이블 이름"
+                                }
+                            },
+                            "required": ["table_name"]
+                        }
+                    }
+                }
+            ]
             
-            # AI에게 전달할 프롬프트 구성
-            schema_info = ""
-            # 모든 테이블의 스키마 정보를 포함하도록 수정
-            for table_name in db_info.get("tables", []):
-                try:
-                    schema = db_manager.get_table_schema(table_name)
-                    schema_info += f"\n테이블: {table_name}\n"
-                    for col in schema:
-                        schema_info += f"  - {col['COLUMN_NAME']} ({col['DATA_TYPE']})\n"
-                except Exception:
-                    continue
-            prompt = f"""
-다음 데이터베이스 스키마를 참고하여 자연어 질문을 SQL 쿼리로 변환해주세요.
-SQL은 가장 정확하다고 판단되는 쿼리 1개만 반환해주세요.
-SQL 쿼리만 반환해주세요. 설명이나 코멘트는 포함하지 마세요.
+            # 메시지 히스토리 초기화
+            messages = [
+                {
+                    "role": "system",
+                    "content": """당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
+필요한 정보가 부족하면 제공된 도구를 사용하여 데이터베이스 스키마를 파악한 후,
+최종적으로 실행 가능한 SELECT SQL 쿼리만 생성해야 합니다.
 
-데이터베이스: {db_info.get('database_name', 'unknown')}
-스키마 정보:
-{schema_info}
+⚠️ 매우 중요한 규칙:
+1. 순수한 SQL 쿼리만 반환하세요
+2. 마크다운 형식(```)을 절대 사용하지 마세요
+3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
+4. 쿼리 1개만 반환하세요
+5. 세미콜론(;)으로 끝내세요
+6. 질문이 모호하거나 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
+7. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
 
-질문: {question}
-
-"""
+도구 사용 순서:
+1. 먼저 get_database_info() 또는 get_table_list()를 호출하여 사용 가능한 테이블 목록을 확인하세요
+2. 필요한 테이블의 스키마를 get_table_schema()로 조회하세요
+3. 스키마 정보를 바탕으로 SQL 쿼리를 생성하세요"""
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ]
             
-            # AI를 사용하여 SQL 생성
-            sql_query = await ai_manager.generate_response(prompt)
+            # Tool 호출 루프
+            max_iterations = 5
+            for iteration in range(max_iterations):
+                # AI 응답 생성
+                response = await ai_manager.generate_response_with_tools(messages, tools)
+                
+                if "error" in response:
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=f"AI 응답 생성 실패: {response['error']}")]
+                    )
+                
+                # AI 응답을 메시지 히스토리에 추가
+                messages.append(response)
+                
+                # Tool 호출이 있는지 확인
+                if "tool_calls" not in response:
+                    # Tool 호출이 없으면 최종 SQL 응답
+                    sql_query = response.get("content", "")
+                    
+                    # SQL 쿼리 실행
+                    if sql_query and not sql_query.startswith("응답 생성 중 오류"):
+                        try:
+                            result = db_manager.execute_query(sql_query)
+                            result_text = f"생성된 SQL: {sql_query}\n\n결과:\n{json.dumps(result, ensure_ascii=False, indent=2)}"
+                        except Exception as e:
+                            result_text = f"생성된 SQL: {sql_query}\n\n실행 오류: {e}"
+                    else:
+                        result_text = f"SQL 생성 실패: {sql_query}"
+                    
+                    return CallToolResult(
+                        content=[TextContent(type="text", text=result_text)]
+                    )
+                
+                # Tool 호출 처리
+                tool_calls = response["tool_calls"]
+                logger.info(f"Tool 호출 감지: {[tc['function']['name'] for tc in tool_calls]}")
+                
+                for tool_call in tool_calls:
+                    func_name = tool_call["function"]["name"]
+                    func_args = tool_call["function"]["arguments"]
+                    
+                    # Tool 실행
+                    if func_name == "get_database_info":
+                        db_info = db_manager.get_database_info()
+                        tool_result = json.dumps(db_info, ensure_ascii=False, indent=2)
+                    elif func_name == "get_table_list":
+                        table_list = db_manager.get_table_list()
+                        tool_result = json.dumps(table_list, ensure_ascii=False, indent=2)
+                    elif func_name == "get_table_schema":
+                        table_name = func_args.get("table_name", "")
+                        if table_name:
+                            schema = db_manager.get_table_schema(table_name)
+                            tool_result = json.dumps(schema, ensure_ascii=False, indent=2)
+                        else:
+                            tool_result = json.dumps({"error": "테이블 이름이 제공되지 않았습니다."})
+                    else:
+                        tool_result = json.dumps({"error": f"알 수 없는 도구: {func_name}"})
+                    
+                    # Tool 결과를 메시지 히스토리에 추가
+                    messages.append({
+                        "role": "tool",
+                        "content": tool_result,
+                        "tool_call_id": tool_call["id"]
+                    })
             
-            # SQL 쿼리 실행
-            if sql_query and not sql_query.startswith("응답 생성 중 오류"):
-                try:
-                    result = db_manager.execute_query(sql_query)
-                    result_text = f"생성된 SQL: {sql_query}\n\n결과:\n{json.dumps(result, ensure_ascii=False, indent=2)}"
-                except Exception as e:
-                    result_text = f"생성된 SQL: {sql_query}\n\n실행 오류: {e}"
-            else:
-                result_text = f"SQL 생성 실패: {sql_query}"
-            
+            # 최대 반복 횟수 초과
             return CallToolResult(
-                content=[TextContent(type="text", text=result_text)]
+                content=[TextContent(type="text", text="Tool 호출이 너무 많습니다. 질문을 다시 확인해 주세요.")]
             )
             
         except Exception as e:
@@ -227,6 +330,19 @@ SQL 쿼리만 반환해주세요. 설명이나 코멘트는 포함하지 마세�
         except Exception as e:
             return CallToolResult(
                 content=[TextContent(type="text", text=f"데이터베이스 정보 조회 중 오류: {e}")]
+            )
+    
+    async def _get_table_list(self, arguments: Dict[str, Any]) -> CallToolResult:
+        """테이블 목록을 반환합니다."""
+        try:
+            table_list = db_manager.get_table_list()
+            list_text = json.dumps(table_list, ensure_ascii=False, indent=2)
+            return CallToolResult(
+                content=[TextContent(type="text", text=list_text)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"테이블 목록 조회 중 오류: {e}")]
             )
     
     async def _get_table_schema(self, arguments: Dict[str, Any]) -> CallToolResult:
