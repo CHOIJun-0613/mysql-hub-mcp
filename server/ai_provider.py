@@ -16,7 +16,7 @@ class AIProvider(ABC):
     """AI Provider 추상 클래스"""
     
     @abstractmethod
-    async def generate_response(self, prompt: str) -> str:
+    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
         """프롬프트에 대한 응답을 생성합니다."""
         pass
     
@@ -50,13 +50,28 @@ class GroqProvider(AIProvider):
         except Exception as e:
             logger.error(f"Groq 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str) -> str:
+    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
         """Groq를 사용하여 응답을 생성합니다."""
         if not self.client:
             return "Groq 클라이언트가 초기화되지 않았습니다."
         
         try:
             import httpx
+            
+            # 요청 데이터 구성
+            request_data = {
+                "model": self.model,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 1000,
+                "temperature": 0.1
+            }
+            
+            # tools가 제공된 경우 추가
+            if tools:
+                request_data["tools"] = tools
+                request_data["tool_choice"] = "auto"
             
             # httpx를 사용하여 timeout 설정
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -66,55 +81,28 @@ class GroqProvider(AIProvider):
                         "Authorization": f"Bearer {config.GROQ_API_KEY}",
                         "Content-Type": "application/json"
                     },
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "system", "content": """
-당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
-필요한 정보가 부족하면 제공된 도구를 사용하여 데이터베이스 스키마를 파악한 후,
-최종적으로 실행 가능한 SELECT SQL 쿼리만 생성해야 합니다. 
-
-⚠️ 매우 중요한 규칙:
-1. 순수한 SQL 쿼리만 반환하세요
-2. 마크다운 형식(```)을 절대 사용하지 마세요
-3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
-4. 쿼리 1개만 반환하세요
-5. 세미콜론(;)으로 끝내세요
-6. 질문이 모호하거나 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
-- 문장구성이 안되어 있는 경우
-- 불완전하거나 뜻이 모호한 경우
-- 문법적으로 잘못되어 있는 경우
-- 의미없는 문장으로 되어 있는 경우우
-- 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
-7. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
-- MySQL doesn't yet support
-- 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
-- 잘못된 예시: SELECT *  FROM users WHERE id IN ( SELECT user_id FROM orders ORDER BY order_date DESC LIMIT 1);
-- 올바른 예시: SELECT u.* FROM users u JOIN orders o ON u.id = o.user_id ORDER BY o.order_date DESC LIMIT 1;
-
-== 예시 ==
-예시 올바른 응답:
-SELECT * FROM users;
-
-예시 잘못된 응답:
-```sql
-SELECT * FROM users;
-```
-또는
-SELECT * FROM users;
-### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
-"""
-                            },
-                            {"role": "user", "content": prompt}
-                        ],
-                        "max_tokens": 1000,
-                        "temperature": 0.1
-                    }
+                    json=request_data
                 )
                 
                 if response.status_code == 200:
                     result = response.json()
-                    return result["choices"][0]["message"]["content"]
+                    message = result["choices"][0]["message"]
+                    
+                    # tools를 사용한 경우 tool_calls가 있을 수 있음
+                    if "tool_calls" in message:
+                        # Tool 호출이 있는 경우 처리
+                        tool_calls = message.get("tool_calls", [])
+                        if tool_calls:
+                            # 첫 번째 tool call의 함수 이름 반환 (디버깅용)
+                            first_tool = tool_calls[0]
+                            func_name = first_tool.get("function", {}).get("name", "unknown")
+                            return f"Tool 호출 감지: {func_name} (tools 지원 필요)"
+                    
+                    # 일반적인 content 응답
+                    if "content" in message:
+                        return message["content"]
+                    else:
+                        return "응답에 content가 없습니다."
                 else:
                     return f"Groq API 오류: {response.status_code} - {response.text}"
         except Exception as e:
@@ -175,50 +163,18 @@ class OllamaProvider(AIProvider):
         except Exception as e:
             logger.error(f"Ollama 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str) -> str:
+    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
         """Ollama를 사용하여 응답을 생성합니다."""
         try:
             import httpx
             import json
             
+            # tools가 제공된 경우 tools 지원 모델이 필요하므로 오류 반환
+            if tools:
+                return "현재 Ollama 모델이 tools를 지원하지 않습니다. Groq를 사용하거나 tools 지원 모델로 변경하세요."
+            
             # 메시지를 프롬프트로 변환
             messages = [
-                {"role": "system", "content": """
-당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
-필요한 정보가 부족하면 제공된 도구를 사용하여 데이터베이스 스키마를 파악한 후,
-최종적으로 실행 가능한 SELECT SQL 쿼리만 생성해야 합니다. 
-
-⚠️ 매우 중요한 규칙:
-1. 순수한 SQL 쿼리만 반환하세요
-2. 마크다운 형식(```)을 절대 사용하지 마세요
-3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
-4. 쿼리 1개만 반환하세요
-5. 세미콜론(;)으로 끝내세요
-6. 질문이 모호하거나 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
-- 문장구성이 안되어 있는 경우
-- 불완전하거나 뜻이 모호한 경우
-- 문법적으로 잘못되어 있는 경우
-- 의미없는 문장으로 되어 있는 경우우
-- 예시: '13213214`3ㄹㅇㄴㅁㄹㅇㄴㅁㄹ', 'afdsafdsjaljfdsla' ,'가나다라마바사앙자차카ㅇ타하하'등 
-7. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
-- MySQL doesn't yet support
-- 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
-- 잘못된 예시: SELECT *  FROM users WHERE id IN ( SELECT user_id FROM orders ORDER BY order_date DESC LIMIT 1);
-- 올바른 예시: SELECT u.* FROM users u JOIN orders o ON u.id = o.user_id ORDER BY o.order_date DESC LIMIT 1;
-
-== 예시 ==
-예시 올바른 응답:
-SELECT * FROM users;
-
-예시 잘못된 응답:
-```sql
-SELECT * FROM users;
-```
-또는
-SELECT * FROM users;
-### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
-"""
-                },
                 {"role": "user", "content": prompt}
             ]
             
@@ -246,13 +202,15 @@ SELECT * FROM users;
                 }
             }
             
-            logger.debug(f"Ollama API 호출 시작: {self.url}/api/generate")
+            endpoint = "/api/generate"
+            
+            logger.debug(f"Ollama API 호출 시작: {self.url}{endpoint}")
             logger.debug(f"모델: {self.model}")
             logger.debug(f"프롬프트 길이: {len(prompt_text)}")
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.url}/api/generate",
+                    f"{self.url}{endpoint}",
                     json=payload,
                     headers={"Content-Type": "application/json"},
                     timeout=180.0  # 타임아웃을 180초로 설정
@@ -423,13 +381,13 @@ class AIProviderManager:
         
         logger.error("사용 가능한 AI Provider가 없습니다.")
     
-    async def generate_response(self, prompt: str) -> str:
+    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
         """현재 Provider를 사용하여 응답을 생성합니다."""
         provider = self.providers.get(self.current_provider)
         if not provider:
             return "사용 가능한 AI Provider가 없습니다."
         
-        return await provider.generate_response(prompt)
+        return await provider.generate_response(prompt, tools)
     
     async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
         """현재 Provider를 사용하여 Tool과 함께 응답을 생성합니다."""

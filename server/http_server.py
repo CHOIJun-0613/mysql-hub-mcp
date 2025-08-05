@@ -189,7 +189,7 @@ async def natural_language_query(request: NaturalLanguageRequest):
         if "error" in db_info:
             raise HTTPException(status_code=500, detail=f"데이터베이스 연결 오류: {db_info['error']}")
         
-        # AI에게 전달할 프롬프트 구성
+        # 현재 tools 지원 모델이 없으므로 기존 방식으로 스키마 정보 수집
         schema_info = ""
         # devdb 데이터베이스의 실제 테이블들만 사용
         user_tables = [table for table in db_info.get("tables", []) 
@@ -215,8 +215,51 @@ async def natural_language_query(request: NaturalLanguageRequest):
                 logger.warning(f"테이블 {table_name} 스키마 조회 실패: {e}")
                 continue
         
-        prompt = f"""
-당신은 MySQL 데이터베이스 쿼리 전문가입니다. 자연어를 SQL 쿼리로 변환해주세요.
+        # Tool 정의
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_database_info",
+                    "description": "데이터베이스 정보와 테이블 목록을 반환합니다.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_table_list",
+                    "description": "데이터베이스의 모든 테이블 목록을 반환합니다.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_table_schema",
+                    "description": "특정 테이블의 스키마 정보를 반환합니다.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "table_name": {
+                                "type": "string",
+                                "description": "테이블 이름"
+                            }
+                        },
+                        "required": ["table_name"]
+                    }
+                }
+            }
+        ]
+        
+        # 시스템 프롬프트 구성 (기존 방식)
+        system_prompt = """당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
 
 ⚠️ 매우 중요한 규칙:
 1. 순수한 SQL 쿼리만 반환하세요
@@ -224,38 +267,35 @@ async def natural_language_query(request: NaturalLanguageRequest):
 3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
 4. 쿼리 1개만 반환하세요
 5. 세미콜론(;)으로 끝내세요
+6. 질문이 모호하거나 문장구성이 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
+- 예시: 'afdksafdsalfj', 'ㅁ렁ㄴ123ㅓ  마ㅣㄹaaghgl'등
+7. ID는 시스템에게만 의미있는 값이므로 ID보다는 이름(명) 필드를 SQL의 조회 필드로 사용하세요.
+- 예시: user_id 보다는 user_name 필드를 조회 필드로 사용하세요.
+- ID가 사용자 질의에 '~id', '~번호' 등으로 표시되어 있는 경우만만 필드로 사용하세요.
+8. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
+- MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
+- 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
+- 예시: SELECT * FROM (SELECT * FROM UserInfo WHERE CreateDate >= '2010-01-01' LIMIT 0,10) AS temp_tbl;
 
-예시 올바른 응답:
-SELECT * FROM users;
-
-예시 잘못된 응답:
-```sql
-SELECT * FROM users;
-```
-또는
-SELECT * FROM users;
-### 설명: 사용자 테이블의 모든 데이터를 조회합니다.
-
-=== 추가 정보 ===
-MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
--해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
-예시:
-SELECT * FROM (SELECT * FROM UserInfo WHERE CreateDate >= '2010-01-01' LIMIT 0,10) AS temp_tbl;
-
-데이터베이스: {db_info.get('database_name', 'unknown')}
+=== 데이터베이스: {database_name} 
 
 === 테이블 스키마 정보 ===
 {schema_info}
 
 === 질문 ===
-{request.question}
+{question}
 
-이제 위 질문에 대한 SQL 쿼리만 반환하세요:
-"""
+이제 위 질문에 대한 SQL 쿼리만 반환하세요:"""
+        
+        prompt = system_prompt.format(
+            database_name=db_info.get('database_name', 'unknown'),
+            schema_info=schema_info,
+            question=request.question
+        )
        
         logger.info(f"자연어 쿼리: \n\n[{request.question}]\n")
         logger.debug(f"자연어 쿼리 프롬프트: \n{prompt}\n")
-        # AI를 사용하여 SQL 생성
+        # AI를 사용하여 SQL 생성 (tools 없이)
         sql_query = await ai_manager.generate_response(prompt)
         
         # AI 응답 검증
