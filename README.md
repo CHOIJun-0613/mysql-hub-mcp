@@ -1,79 +1,27 @@
-# MySQL Hub MCP Server
+# MySQL Hub MCP
 
-MySQL 데이터베이스와 자연어 쿼리를 지원하는 MCP(Model Context Protocol) 서버입니다. HTTP 기반 통신과 MCP stdio 프로토콜을 모두 지원합니다.
+MySQL 데이터베이스와 자연어 쿼리를 지원하는 MCP 서버입니다.
 
-## 📋 목적
+## 기능
 
-1. Cursor AI에서 MCP를 통해 MySQL DB서버에 연결
-2. Cursor AI chat 창에서 MySQL에 자연어로 데이터를 검색
-3. HTTP API를 통한 직접적인 데이터베이스 조작
-4. 자연어를 SQL로 변환하는 AI 기반 쿼리 시스템
+- MySQL 데이터베이스 연결 및 쿼리 실행
+- 자연어를 SQL로 변환
+- AI Provider 지원 (Groq, Ollama)
+- Tool 지원 LLM을 통한 지능형 데이터베이스 쿼리
 
-## 🏗️ 프로젝트 구조
+## 설치 및 설정
 
-```
-mysql-hub-mcp/
-├── client/                 # HTTP 기반 MCP 클라이언트 애플리케이션
-│   ├── client_app.py      # httpx 기반 클라이언트 메인 애플리케이션
-│   ├── run_client.py      # 클라이언트 실행 스크립트
-│   └── pyproject.toml     # 클라이언트 의존성
-├── server/                # MCP 서버 및 HTTP 서버
-│   ├── server_app.py      # 서버 메인 애플리케이션
-│   ├── mcp_server.py      # MCP 서버 구현
-│   ├── http_server.py     # FastAPI 기반 HTTP API 서버
-│   ├── database.py        # MySQL 데이터베이스 관리 (UTF-8 처리 포함)
-│   ├── ai_provider.py     # AI Provider 관리 (Groq/Ollama)
-│   ├── config.py          # 설정 관리
-│   ├── run_server.py      # 서버 실행 스크립트
-│   ├── env.example        # 환경 설정 예제
-│   └── pyproject.toml     # 서버 의존성
-├── bridge/                # Cursor MCP Bridge
-│   ├── mcp_bridge.py      # Cursor Bridge 구현
-│   └── pyproject.toml     # Bridge 의존성
-├── docs/                  # 문서
-│   └── requirement.md     # 요구사항 문서
-├── pyproject.toml         # 프로젝트 루트 설정
-└── README.md             # 프로젝트 설명서
-```
+### 1. 환경 설정
 
-## 🚀 설치 및 설정
-
-### 1. 의존성 설치
-
-각 컴포넌트별로 의존성을 설치합니다:
-
-```bash
-# 서버 의존성 설치
-cd server
-uv sync
-
-# 클라이언트 의존성 설치
-cd ../client
-uv sync
-
-# Bridge 의존성 설치
-cd ../bridge
-uv sync
-```
-
-### 2. 환경 설정
-
-서버 디렉토리에 `.env` 파일을 생성하고 설정합니다:
-
-```bash
-cd server
-cp env.example .env
-```
-
-`.env` 파일을 편집하여 다음 설정을 구성합니다:
+`.env` 파일을 생성하고 다음 내용을 입력하세요:
 
 ```env
 # MySQL 데이터베이스 설정
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
-MYSQL_USER=devuser
+MYSQL_USER=root
 MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=devdb
+MYSQL_DATABASE=your_database
 
 # AI Provider 설정 (groq 또는 ollama)
 AI_PROVIDER=ollama
@@ -83,8 +31,9 @@ GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama3-8b-8192
 
 # Ollama 설정
+# Tool 지원 모델: qwen2.5-coder, llama3.1:8b, codellama:7b 등
 OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3:8b
+OLLAMA_MODEL=qwen2.5-coder
 
 # 로깅 설정
 LOG_LEVEL=INFO
@@ -95,301 +44,166 @@ SERVER_HOST=localhost
 SERVER_PORT=8000
 ```
 
-## 🎯 사용법
+### 2. 의존성 설치
+
+```bash
+# 서버 의존성 설치
+cd server
+pip install -r requirements.txt
+
+# 클라이언트 의존성 설치
+cd ../client
+pip install -r requirements.txt
+```
+
+### 3. Ollama Tool 지원 모델 설정
+
+**qwen2.5-coder 모델 사용 (권장):**
+```bash
+# qwen2.5-coder 모델 다운로드
+ollama pull qwen2.5-coder
+
+# 모델 실행 테스트
+ollama run qwen2.5-coder "Hello, can you help me with coding?"
+```
+
+**다른 Tool 지원 모델들:**
+- `llama3.1:8b` - Meta의 최신 Llama 모델
+- `codellama:7b` - 코드 생성에 특화된 모델
+- `deepseek-coder:6.7b` - 코드 이해에 강점이 있는 모델
+
+**Tool 지원 확인:**
+```bash
+# 모델이 tool을 지원하는지 확인
+curl -X POST http://localhost:11434/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2.5-coder",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "tools": [{"type": "function", "function": {"name": "test", "description": "test"}}]
+  }'
+```
+
+## 사용법
 
 ### 1. 서버 실행
 
-#### HTTP 서버만 실행 (권장)
 ```bash
+# 서버 실행
 cd server
-uv run run_server.py --mode http
+python run_server.py
+
+# 또는 HTTP 서버만 실행
+python run_http_server.py
 ```
 
-#### HTTP 서버와 MCP 서버 동시 실행
+### 2. HTTP API를 통한 Tool 지원 쿼리
+
+**자연어 쿼리 (Tool 지원):**
 ```bash
-cd server
-uv run run_server.py
+curl -X POST http://localhost:8000/database/natural-query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "사용자 테이블의 모든 데이터를 보여줘"
+  }'
 ```
 
-#### MCP 서버만 실행
+**데이터베이스 정보 조회:**
 ```bash
-cd server
-uv run run_server.py --mode mcp
+curl http://localhost:8000/database/info
 ```
 
-### 2. 클라이언트 실행
-
-#### 웹 인터페이스 (권장)
+**테이블 스키마 조회:**
 ```bash
+curl -X POST http://localhost:8000/database/table-schema \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table_name": "users"
+  }'
+```
+
+**직접 SQL 실행:**
+```bash
+curl -X POST http://localhost:8000/database/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM users LIMIT 5"
+  }'
+```
+
+### 3. Tool 지원 기능
+
+HTTP API는 다음과 같은 tool들을 지원합니다:
+
+1. **get_database_info**: 데이터베이스 정보와 테이블 목록 조회
+2. **get_table_schema**: 특정 테이블의 스키마 정보 조회  
+3. **execute_sql**: SQL 쿼리 실행
+
+AI 모델이 자연어 질문을 분석하여 필요한 tool을 순차적으로 호출하여 답변을 생성합니다.
+
+### 4. 클라이언트 실행
+
+```bash
+# 웹 클라이언트 실행
 cd client
-uv run run_web_client.py
-```
-웹 브라우저에서 `http://localhost:8501`로 접속하여 사용할 수 있습니다.
+python run_web_client.py
 
-**주요 기능:**
-- 🤖 자연어로 데이터베이스 질문
-- ⚡ 직접 SQL 쿼리 실행
-- 📋 데이터베이스 정보 조회
-- 📊 테이블 스키마 확인
-- 📊 결과를 표 형태로 시각화
-
-#### 대화형 모드 (터미널)
-```bash
-cd client
-uv run run_client.py
+# 또는 일반 클라이언트 실행
+python run_client.py
 ```
 
-#### 배치 모드 - 자연어 쿼리
-```bash
-cd client
-uv run run_client.py --tool natural_language_query --question "사용자 테이블에서 모든 데이터를 조회해주세요"
-```
+## API 엔드포인트
 
-#### 배치 모드 - SQL 실행
-```bash
-cd client
-uv run run_client.py --tool execute_sql --sql "SELECT * FROM users"
-```
-
-#### 도구 목록 확인
-```bash
-cd client
-uv run run_client.py --list-tools
-```
-
-### 3. Bridge 실행 (테스트용)
-
-```bash
-cd bridge
-uv run mcp_bridge.py --question "사용자 테이블에서 모든 데이터를 조회해주세요"
-```
-
-## 🔧 제공되는 도구
-
-### 1. execute_sql
-- **설명**: MySQL 데이터베이스에서 SQL 쿼리를 실행합니다.
-- **매개변수**: `sql` (실행할 SQL 쿼리)
-- **예시**: `SELECT * FROM users WHERE user_name = '홍길동'`
-
-### 2. natural_language_query
-- **설명**: 자연어를 SQL 쿼리로 변환하여 실행합니다.
-- **매개변수**: `question` (자연어로 된 질문)
-- **예시**: 
-  - "노트북을 주문한 사용자의 이름과 이메일을 조회해주세요"
-  - "가장 많이 주문한 사용자를 찾아주세요"
-  - "각 사용자별로 주문한 상품과 금액을 보여주세요"
-
-### 3. get_database_info
-- **설명**: 데이터베이스 정보와 테이블 목록을 반환합니다.
-- **매개변수**: 없음
-
-### 4. get_table_schema
-- **설명**: 특정 테이블의 스키마 정보를 반환합니다.
-- **매개변수**: `table_name` (테이블 이름)
-
-## 🌐 HTTP API
-
-서버가 실행되면 다음 HTTP API를 사용할 수 있습니다:
-
-### 기본 엔드포인트
-- `GET /` - 서버 상태 확인
-- `GET /health` - 헬스 체크
-
-### 데이터베이스 엔드포인트
-- `GET /database/info` - 데이터베이스 정보
+### 데이터베이스 관련
+- `GET /database/info` - 데이터베이스 정보 조회
+- `GET /database/tables` - 테이블 목록 조회
+- `POST /database/table-schema` - 테이블 스키마 조회
 - `POST /database/execute` - SQL 쿼리 실행
-- `POST /database/natural-query` - 자연어 쿼리 실행
-- `GET /database/tables` - 테이블 목록
-- `POST /database/table-schema` - 테이블 스키마
+- `POST /database/natural-query` - 자연어 쿼리 (Tool 지원)
 
-### AI Provider 엔드포인트
+### AI Provider 관련
 - `GET /ai/provider` - 현재 AI Provider 정보
 - `POST /ai/switch-provider` - AI Provider 전환
 
-## 🤖 AI Provider
+### 시스템
+- `GET /` - 서버 상태 확인
+- `GET /health` - 헬스 체크
 
-### Groq
-- **특징**: 빠른 응답 속도, 클라우드 기반
-- **설정**: `AI_PROVIDER=groq`
-- **필요**: API 키 설정
+## 로깅
 
-### Ollama
-- **특징**: 로컬 실행 가능, 오프라인 사용 가능
-- **설정**: `AI_PROVIDER=ollama`
-- **필요**: Ollama 서버 실행 (기본: http://localhost:11434)
+로그는 `server/logs/` 디렉토리에 저장됩니다. 로그 레벨은 `.env` 파일의 `LOG_LEVEL`로 설정할 수 있습니다.
 
-## 📊 실제 테스트 결과
+## 문제 해결
 
-### 성공적인 쿼리 실행 예시
+### Tool 지원이 작동하지 않는 경우
 
-#### 직접 SQL 실행 (권장 방법)
-```sql
--- 사용자 정보 조회
-SELECT * FROM users ORDER BY id;
-결과: 3명의 사용자 정보 (홍길동, 이순신, 세종대왕)
+1. **Ollama 모델 확인:**
+   ```bash
+   ollama list
+   ```
 
--- 특정 이메일 사용자 조회
-SELECT user_name, signup_date FROM users WHERE email = 'gildong@example.com';
-결과: 홍길동, 2024-01-15
+2. **Tool 지원 테스트:**
+   ```bash
+   curl -X POST http://localhost:11434/api/chat \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "qwen2.5-coder",
+       "messages": [{"role": "user", "content": "Hello"}],
+       "tools": [{"type": "function", "function": {"name": "test", "description": "test"}}]
+     }'
+   ```
 
--- 노트북 주문 사용자 조회
-SELECT u.user_name, u.email FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.product_name LIKE '%노트북%';
-결과: 홍길동, gildong@example.com
+3. **로그 확인:**
+   ```bash
+   tail -f server/logs/server.log
+   ```
 
--- 가장 비싼 상품 주문자 조회
-SELECT u.user_name, o.product_name, o.amount FROM users u INNER JOIN orders o ON u.id = o.user_id WHERE o.amount = (SELECT MAX(amount) FROM orders);
-결과: 홍길동, 노트북, 1,500,000원
+### 데이터베이스 연결 오류
 
--- 특정 날짜 이후 주문 상품 조회
-SELECT product_name FROM orders WHERE order_date > '2024-07-05' ORDER BY order_date;
-결과: 집현전 대형 책상, 거북선 모양 USB
-```
+1. MySQL 서비스가 실행 중인지 확인
+2. `.env` 파일의 데이터베이스 설정 확인
+3. 사용자 권한 확인
 
-#### 자연어 쿼리 실행 (대안 방법)
-```bash
-# 기본 조회
-질문: "사용자 테이블에서 모든 데이터를 조회해주세요"
-생성된 SQL: SELECT * FROM users;
-결과: 3명의 사용자 정보 (홍길동, 이순신, 세종대왕)
+## 라이선스
 
-# 조건부 조회
-질문: "노트북을 주문한 사용자의 이름과 이메일을 조회해주세요"
-생성된 SQL: SELECT DISTINCT u.user_name, u.email FROM users u JOIN orders o ON u.id = o.user_id WHERE o.product_name = '노트북';
-결과: 노트북을 주문한 사용자 정보
-
-# 복잡한 JOIN 쿼리
-질문: "가장 비싼 상품을 주문한 사용자의 이름과 상품명을 조회해주세요"
-생성된 SQL: SELECT u.user_name, o.product_name FROM orders o JOIN users u ON o.user_id = u.id WHERE o.amount = (SELECT MAX(amount) FROM orders);
-결과: 최고가 주문 정보
-```
-
-## 🛡️ 오류 처리 및 안정성
-
-### UTF-8 인코딩 처리
-- 바이너리 데이터를 16진수 문자열로 자동 변환
-- 제어 문자 자동 제거
-- 마크다운 코드 블록 자동 제거
-
-### AI 응답 검증
-- 오류 메시지 감지 및 차단
-- SQL 키워드 검증
-- 타임아웃 처리 (60초)
-
-### 데이터베이스 연결
-- 연결 풀링 및 자동 재연결
-- UTF-8 인코딩 강제 설정
-- 쿼리 유효성 검사
-
-### MCP Bridge 파라미터 수정
-- `execute_sql` 함수의 파라미터명을 `query`에서 `sql`로 수정
-- FastMCP 프레임워크와의 호환성 개선
-- 직접 SQL 실행 기능 안정화
-
-## 📝 로깅
-
-로그는 다음 위치에 저장됩니다:
-- 콘솔 출력
-- `logs/server-YYYYMMDD.log` (서버 로그)
-- `logs/client-YYYYMMDD.log` (클라이언트 로그)
-
-### 로그 파일 특징
-- **날짜별 분리**: 매일 새로운 로그 파일 생성
-- **UTF-8 인코딩**: 한글 로그가 깨지지 않음
-- **자동 디렉토리 생성**: logs 폴더가 없으면 자동 생성
-
-로그 레벨은 환경 변수 `LOG_LEVEL`로 설정할 수 있습니다:
-- DEBUG: 상세한 디버깅 정보
-- INFO: 일반적인 정보 (기본값)
-- WARNING: 경고 메시지
-- ERROR: 오류 메시지
-
-## 🔗 Cursor AI 연동
-
-Cursor AI에서 이 MCP 서버를 사용하려면:
-
-1. Cursor AI 설정에서 MCP 서버를 추가
-2. MCP Server 등록
-  ```json
-  "mcpServers": {
-    "mysql-hub-mcp": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "D:\\workspaces\\mcp-work\\mysql-hub-mcp\\bridge",
-        "run",
-        "mcp_bridge.py",
-        "--url",
-        "http://localhost:8000"
-      ]
-    }
-  }
-  ```
-3. Cursor AI chat에서 자연어로 데이터베이스 질문 가능
-
-### Cursor Rules 설정
-
-효율적인 SQL 쿼리 실행을 위해 Cursor Rules를 설정하는 것을 권장합니다:
-
-1. `.cursor/rules/` 디렉토리에 `mysql-hub-mcp-rule.mdc` 파일 생성
-2. 다음 규칙 추가:
-
-```markdown
-# MySQL Hub MCP 사용 규칙
-
-## SQL 쿼리 실행 우선순위
-
-### 1단계: 직접 SQL 작성 (권장)
-- `mysql-hub-mcp`를 사용할 때는 즉시 `natural_language_query()`를 호출하지 않음
-- 다음 순서로 진행:
-  1. `get_database_info()` - 데이터베이스 정보 및 테이블 목록 확인
-  2. `get_table_schema(table_name)` - 관련 테이블의 스키마 정보 확인
-  3. 스키마 정보를 바탕으로 직접 SQL 문 작성
-  4. `execute_sql(sql)` - 작성한 SQL 직접 실행
-
-### 2단계: 자연어 쿼리 (대안)
-- 위 방법으로 SQL을 작성할 수 없는 경우에만 `natural_language_query()` 사용
-- 복잡한 쿼리나 스키마 정보만으로는 SQL 작성이 어려운 경우
-
-## 목적
-- 더 빠르고 정확한 SQL 실행
-- 불필요한 자연어 변환 과정 최소화
-- 데이터베이스 구조 이해를 통한 효율적인 쿼리 작성
-```
-
-## 🛠️ 개발 환경
-
-- **개발도구**: Cursor IDE
-- **개발언어**: Python 3.10+
-- **패키지 관리**: uv
-- **웹 프레임워크**: FastAPI
-- **HTTP 클라이언트**: httpx
-- **데이터베이스**: MySQL + SQLAlchemy
-- **AI 통합**: Groq API, Ollama
-- **대화 언어**: 한국어 (보조적으로 영어 사용 가능)
-
-## 🔧 주요 기술 스택
-
-- **백엔드**: FastAPI, SQLAlchemy, PyMySQL
-- **AI/ML**: Groq API, Ollama
-- **통신**: HTTP/HTTPS, MCP Protocol
-- **로깅**: Python logging
-- **UI**: Rich (터미널 UI), Streamlit (웹 UI)
-- **설정**: python-dotenv
-- **MCP**: FastMCP, Model Context Protocol
-
-## 📚 참고 문서
-
-- [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/server)
-- [MCP Quickstart](https://modelcontextprotocol.io/quickstart/server)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
-- [Cursor AI Documentation](https://cursor.sh/docs)
-
-## 🤝 기여
-
-이 프로젝트는 학습 목적으로 개발되었습니다. 개선 사항이나 버그 리포트는 언제든 환영합니다.
-
-## 📄 라이선스
-
-이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+MIT License

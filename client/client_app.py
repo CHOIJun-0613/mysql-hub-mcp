@@ -54,7 +54,7 @@ class HTTPMCPClient:
     HTTP MCP 클라이언트 클래스
     FastAPI 서버와 httpx로 통신하여 데이터베이스를 조작합니다.
     """
-    def __init__(self, server_url: str = "http://localhost:8000"):
+    def __init__(self, server_url: str = "http://localhost:8001"):
         self.server_url = server_url.rstrip("/")
         self.tools: List[Dict[str, Any]] = [
             {

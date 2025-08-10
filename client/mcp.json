@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "mysql-hub": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp"
+    },
+    "terminal": {
+      "type": "stdio",
+      "command": "/Users/theailanguage/.local/bin/uv",
+      "args": [
+          "--directory", "/Users/theailanguage/mcp/mcp_stremable_http/stdio_server/1-terminal-server",
+          "run",
+          "terminal_server.py"
+      ]
+    }
+  }
+}

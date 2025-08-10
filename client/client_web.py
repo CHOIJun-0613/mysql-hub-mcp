@@ -51,7 +51,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 서버 URL 설정
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8001")
 
 def make_request(endpoint, data=None, method="GET"):
     """서버에 요청을 보내는 함수"""

@@ -6,8 +6,10 @@ Groq와 Ollama를 선택적으로 사용할 수 있도록 관리합니다.
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
+import asyncio
 import openai
 import groq
+import httpx
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -16,7 +18,7 @@ class AIProvider(ABC):
     """AI Provider 추상 클래스"""
     
     @abstractmethod
-    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
         """프롬프트에 대한 응답을 생성합니다."""
         pass
     
@@ -50,28 +52,36 @@ class GroqProvider(AIProvider):
         except Exception as e:
             logger.error(f"Groq 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
         """Groq를 사용하여 응답을 생성합니다."""
         if not self.client:
             return "Groq 클라이언트가 초기화되지 않았습니다."
         
         try:
-            import httpx
             
-            # 요청 데이터 구성
-            request_data = {
-                "model": self.model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 1000,
-                "temperature": 0.1
-            }
-            
-            # tools가 제공된 경우 추가
-            if tools:
-                request_data["tools"] = tools
-                request_data["tool_choice"] = "auto"
+            # 환경변수에 따라 Tool 사용 여부 결정
+            if config.USE_LLM_TOOLS and tools:
+                # Tool 사용 방식
+                request_data = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "tools": tools,
+                    "tool_choice": "auto",
+                    "max_tokens": 1000,
+                    "temperature": 0.1
+                }
+            else:
+                # 기존 방식 - http_server.py에서 전달받은 프롬프트 그대로 사용
+                request_data = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 1000,
+                    "temperature": 0.1
+                }
             
             # httpx를 사용하여 timeout 설정
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -88,8 +98,8 @@ class GroqProvider(AIProvider):
                     result = response.json()
                     message = result["choices"][0]["message"]
                     
-                    # tools를 사용한 경우 tool_calls가 있을 수 있음
-                    if "tool_calls" in message:
+                    # Tool 사용 방식인 경우 tool_calls가 있을 수 있음
+                    if config.USE_LLM_TOOLS and tools and "tool_calls" in message:
                         # Tool 호출이 있는 경우 처리
                         tool_calls = message.get("tool_calls", [])
                         if tool_calls:
@@ -98,11 +108,7 @@ class GroqProvider(AIProvider):
                             func_name = first_tool.get("function", {}).get("name", "unknown")
                             return f"Tool 호출 감지: {func_name} (tools 지원 필요)"
                     
-                    # 일반적인 content 응답
-                    if "content" in message:
-                        return message["content"]
-                    else:
-                        return "응답에 content가 없습니다."
+                    return message.get("content", "응답이 없습니다.")
                 else:
                     return f"Groq API 오류: {response.status_code} - {response.text}"
         except Exception as e:
@@ -115,7 +121,6 @@ class GroqProvider(AIProvider):
             return {"error": "Groq 클라이언트가 초기화되지 않았습니다."}
         
         try:
-            import httpx
             
             # httpx를 사용하여 timeout 설정
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -163,50 +168,47 @@ class OllamaProvider(AIProvider):
         except Exception as e:
             logger.error(f"Ollama 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
         """Ollama를 사용하여 응답을 생성합니다."""
         try:
-            import httpx
-            import json
             
-            # tools가 제공된 경우 tools 지원 모델이 필요하므로 오류 반환
-            if tools:
-                return "현재 Ollama 모델이 tools를 지원하지 않습니다. Groq를 사용하거나 tools 지원 모델로 변경하세요."
-            
-            # 메시지를 프롬프트로 변환
-            messages = [
-                {"role": "user", "content": prompt}
-            ]
-            
-            # 프롬프트 구성
-            prompt_text = ""
-            for msg in messages:
-                if msg["role"] == "system":
-                    prompt_text += f"System: {msg['content']}\n\n"
-                elif msg["role"] == "user":
-                    prompt_text += f"User: {msg['content']}\n\n"
-                elif msg["role"] == "assistant":
-                    prompt_text += f"Assistant: {msg['content']}\n\n"
-            
-            # 프롬프트 길이 제한
-            if len(prompt_text) > 4000:
-                prompt_text = prompt_text[:4000] + "\n\n[Content truncated due to length]"
-            
-            payload = {
-                "model": self.model,
-                "prompt": prompt_text,
-                "stream": False,
-                "options": {
-                    "temperature": 0.1,
-                    "num_predict": 1024
+            # 환경변수에 따라 Tool 사용 여부 결정
+            if config.USE_LLM_TOOLS and tools:
+                # Tool 사용 방식 - Ollama의 네이티브 Tool 지원 사용
+                messages = [
+                    {"role": "user", "content": prompt}
+                ]
+                
+                payload = {
+                    "model": self.model,
+                    "messages": messages,
+                    "tools": tools,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 1024
+                    }
                 }
-            }
-            
-            endpoint = "/api/generate"
+                
+                endpoint = "/api/chat"  # Tool 사용시 /api/chat 엔드포인트 사용
+            else:
+                # 기존 방식 - http_server.py에서 전달받은 프롬프트 그대로 사용
+                payload = {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 1024
+                    }
+                }
+                
+                endpoint = "/api/generate"  # 기존 방식은 /api/generate 엔드포인트 사용
             
             logger.debug(f"Ollama API 호출 시작: {self.url}{endpoint}")
             logger.debug(f"모델: {self.model}")
-            logger.debug(f"프롬프트 길이: {len(prompt_text)}")
+            if not config.USE_LLM_TOOLS or not tools:
+                logger.debug(f"프롬프트 길이: {len(payload.get('prompt', ''))}")
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -220,7 +222,22 @@ class OllamaProvider(AIProvider):
                 
                 if response.status_code == 200:
                     result = response.json()
-                    response_text = result.get("response", "응답이 없습니다.")
+                    
+                    if config.USE_LLM_TOOLS and tools:
+                        # Tool 사용 방식
+                        message = result.get("message", {})
+                        response_text = message.get("content", "응답이 없습니다.")
+                        
+                        # Tool 호출이 있는 경우 처리
+                        if "tool_calls" in message:
+                            tool_calls = message.get("tool_calls", [])
+                            if tool_calls:
+                                first_tool = tool_calls[0]
+                                func_name = first_tool.get("function", {}).get("name", "unknown")
+                                return f"Tool 호출 감지: {func_name} (tools 지원 필요)"
+                    else:
+                        # 기존 방식
+                        response_text = result.get("response", "응답이 없습니다.")
                     
                     # UTF-8 인코딩 문제 해결
                     try:
@@ -259,8 +276,6 @@ class OllamaProvider(AIProvider):
     async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Tool을 사용하여 응답을 생성합니다."""
         try:
-            import httpx
-            import json
             
             # Ollama의 네이티브 Tool 지원 사용
             payload = {
@@ -310,8 +325,6 @@ class OllamaProvider(AIProvider):
     def is_available(self) -> bool:
         """Ollama가 사용 가능한지 확인합니다."""
         try:
-            import httpx
-            import asyncio
             
             # 간단한 연결 테스트
             async def test_connection():
@@ -381,13 +394,19 @@ class AIProviderManager:
         
         logger.error("사용 가능한 AI Provider가 없습니다.")
     
-    async def generate_response(self, prompt: str, tools: List[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
         """현재 Provider를 사용하여 응답을 생성합니다."""
         provider = self.providers.get(self.current_provider)
         if not provider:
             return "사용 가능한 AI Provider가 없습니다."
         
-        return await provider.generate_response(prompt, tools)
+        # 환경변수에 따라 Tool 사용 여부 결정
+        if config.USE_LLM_TOOLS and tools:
+            # Tool 사용 방식
+            return await provider.generate_response(prompt, tools)
+        else:
+            # 기존 방식 - tools 파라미터 없이 호출
+            return await provider.generate_response(prompt)
     
     async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
         """현재 Provider를 사용하여 Tool과 함께 응답을 생성합니다."""

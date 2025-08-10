@@ -24,6 +24,9 @@ class Config:
     # AI Provider 설정
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "groq")
     
+    # LLM Tool 사용 설정
+    USE_LLM_TOOLS: bool = os.getenv("USE_LLM_TOOLS", "true").lower() == "true"
+    
     # Groq 설정
     GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
@@ -37,8 +40,12 @@ class Config:
     LOG_FORMAT: str = os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     
     # 서버 설정
-    SERVER_HOST: str = os.getenv("SERVER_HOST", "localhost")
-    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8000"))
+    HTTP_SERVER_HOST: str = os.getenv("HTTP_SERVER_HOST", "localhost")
+    HTTP_SERVER_PORT: int = int(os.getenv("HTTP_SERVER_PORT", "9000"))
+   
+    # MCP 서버 설정
+    MCP_SERVER_HOST: str = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
+    MCP_SERVER_PORT: int = int(os.getenv("MCP_SERVER_PORT", "8000"))
     
     @classmethod
     def get_mysql_url(cls) -> str:

@@ -16,6 +16,8 @@ dependencies = [
     "httpx>=0.24.0",
     "rich>=13.0.0",
     "sqlparse>=0.5.3",
+    "fastmcp>=2.11.2",
+    "tool>=0.8.0",
 ]
 
 [build-system]
