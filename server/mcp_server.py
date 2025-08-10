@@ -28,7 +28,7 @@ mcp = FastMCP(
     stateless_http=True
 )
 
-@mcp.tool()
+@mcp.tool(description="데이터베이스 정보를 조회한다.", title="데이터베이스 정보 조회")
 async def get_database_info() -> Dict[str, Any]:
     """데이터베이스 정보를 반환합니다.
     
@@ -43,7 +43,7 @@ async def get_database_info() -> Dict[str, Any]:
         logger.error(f"데이터베이스 정보 조회 실패: {e}")
         return {"error": str(e), "status": "failed"}
     
-@mcp.tool()
+@mcp.tool(description="테이블 목록을 조회한다.", title="테이블 목록록 조회")
 async def get_table_list() -> List[str]:
     """테이블 목록을 반환합니다.
     
@@ -58,7 +58,7 @@ async def get_table_list() -> List[str]:
         logger.error(f"테이블 목록 조회 실패: {e}")
         return []
 
-@mcp.tool()
+@mcp.tool(description="테이블의 Schema 정보를 조회한다.", title="테이블 Schema 조회")
 async def get_table_schema(table_name: str) -> List[Dict[str, Any]]:
     """테이블 스키마를 반환합니다.
     
@@ -79,7 +79,7 @@ async def get_table_schema(table_name: str) -> List[Dict[str, Any]]:
         logger.error(f"테이블 스키마 조회 실패: {e}")
         return []
 
-@mcp.tool()
+@mcp.tool(description="입력받은 SQL 쿼리를 실행합니다.", title="SQL 쿼리 실행")
 async def execute_sql(sql: str) -> Dict[str, Any]:
     """SQL 쿼리를 실행합니다.
     

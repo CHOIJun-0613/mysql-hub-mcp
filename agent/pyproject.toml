@@ -1,0 +1,31 @@
+[project]
+name = "mysql-hub-mcp-agent"
+version = "0.1.0"
+description = "MySQL Hub MCP를 위한 Google ADK 기반 AI Agent"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-adk",
+    "rich",
+    "python-dotenv",
+    "asyncio"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "flake8"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
