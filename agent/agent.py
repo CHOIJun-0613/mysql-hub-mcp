@@ -20,11 +20,11 @@ from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
 from google.adk.tools.mcp_tool import StdioConnectionParams
 
-# 로컬 STDIO 기반 MCP 서버를 위한 커스텀 매개변수
-from google.adk.tools.mcp_tool import StdioServerParameters
+# Non-Google LLM을 연결하기 위한 LiteLLM 래퍼
+from google.adk.models.lite_llm import LiteLlm
 
 # config.json 파일을 읽기 위한 유틸리티 함수
-from utilities import read_config_json
+from agent.utilities import read_config_json
 
 
 # ------------------------------------------------------------------------------
@@ -72,9 +72,12 @@ class AgentWrapper:
         #     tools=toolsets
         # )
         
-        # 로컬 모델 사용 (LiteLlm 대신 기본 모델 사용)
+       # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
+        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
+        local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
+        
         self.agent = LlmAgent(
-            model="gemini-2.0-flash",  # agent를 구동할 모델 선택
+            model=local_llama_model,  # agent를 구동할 모델 선택
             name="mysql_assistant",
             instruction="당신은 사용자의 질문에 친절하게 답변하는 AI 비서입니다. MySQL 데이터베이스 관련 작업을 도와드립니다.",
             tools=toolsets
@@ -105,10 +108,8 @@ class AgentWrapper:
 
                 elif server.get("type") == "stdio":
                     conn = StdioConnectionParams(
-                        server_params=StdioServerParameters(
-                            command=server["command"],
-                            args=server["args"]
-                        ),
+                        command=server["command"],
+                        args=server["args"],
                         timeout=5
                     )
                 else:

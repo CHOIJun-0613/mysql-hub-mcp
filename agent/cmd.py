@@ -16,10 +16,10 @@ from .utilities import print_json_response
 # ------------------------------------------------------------------------------
 
 # ADK 앱 식별자 (세션이나 도구를 등록할 때 사용)
-APP_NAME = "google_adk_gemini_mcp_client"
+APP_NAME = "mysql_assistant"
 
 # 현재 세션을 위한 고유 사용자 ID
-USER_ID = "theailanguage_001"
+USER_ID = "mysql_assistant_001"
 
 # 고유 세션 ID (여러 세션을 재개하거나 구분하는 데 도움이 됨)
 SESSION_ID = "session_001"
@@ -27,11 +27,11 @@ SESSION_ID = "session_001"
 # 클라이언트가 사용할 수 있는 도구 세트 정의
 # 이들은 하나 이상의 도구 서버에서 올 수 있습니다
 READ_ONLY_TOOLS = [
-    'add_numbers',
-    'subtract_numbers',
-    'multiply_numbers',
-    'divide_numbers',
-    'run_command'
+    'execute_sql',
+    'natural_language_query',
+    'get_database_info',
+    'get_table_list',
+    'get_table_schema'
 ]
 
 # ------------------------------------------------------------------------------

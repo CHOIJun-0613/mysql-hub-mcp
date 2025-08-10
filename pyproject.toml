@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.12.15",
     "google-adk>=1.10.0",
+    "litellm>=1.75.4",
 ]
 
 [tool.uv.workspace]
