@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1821,6 +1821,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "google-adk" },
     { name = "litellm" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -1828,6 +1829,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.15" },
     { name = "google-adk", specifier = ">=1.10.0" },
     { name = "litellm", specifier = ">=1.75.4" },
+    { name = "rich", specifier = ">=14.1.0" },
 ]
 
 [[package]]

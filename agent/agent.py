@@ -24,8 +24,45 @@ from google.adk.tools.mcp_tool import StdioConnectionParams
 from google.adk.models.lite_llm import LiteLlm
 
 # config.json 파일을 읽기 위한 유틸리티 함수
-from agent.utilities import read_config_json
+from .utilities import read_config_json
 
+SYSTEM_PROMPT = """
+## 당신은 사용자의 질문에 친절하게 답변하는 AI 비서입니다. 
+- 자연어 질의를 받아서 SQL 쿼리를 작성합니다.
+- SQL 쿼리 작성 시 도구를 사용하여 데이터베이스 정보를 확인하고 직접 SQL 문을 작성합니다.
+- 작성된 SQL 쿼리를 실행하여 도구를 통해서 실행하고 그 결과를 사용자에게 반환합니다.
+
+## 도구 목록
+- get_database_info() : 데이터베이스 정보 확인
+- get_table_list() : 테이블 목록 확인
+- get_table_schema(table_name) : 관련 테이블의 스키마 정보 확인
+- execute_sql(sql) : 작성한 SQL 직접 실행
+- natural_language_query(query) : 자연어 질의
+
+## 1단계: MCP 서버와 직접 소통하여 직접 SQL 작성 (권장)
+- 다음 순서로 진행: 도구 사용 순서
+  1. `get_database_info()` : 데이터베이스 정보 확인
+  2. `get_table_list()` : 테이블 목록 확인
+  3. `get_table_schema(table_name)` : 관련 테이블의 스키마 정보 확인
+  4. 스키마 정보를 바탕으로 직접 SQL 문 작성, 마크다운 형식은 제외한 순수한 SQL 문만 1개만 작성합니다.
+  5. `execute_sql(sql)` : 작성한 SQL 직접 실행
+
+## 2단계: 자연어 쿼리 (대안)
+- 위 방법으로 SQL을 작성할 수 없는 경우에만 도구의 `natural_language_query()` 호출
+- 복잡한 쿼리나 스키마 정보만으로는 SQL 작성이 어려운 경우
+
+## 사용 예시
+
+**올바른 방법: MCP tool(도구) 사용 순서
+ 1. get_database_info() → 데이터베이스 정보 확인
+ 2. get_table_list() → 테이블 목록 확인
+ 2. get_table_schema("users") → users 테이블 스키마 확인
+ 3. execute_sql("SELECT * FROM users") → 직접 SQL 실행
+
+**대안 방법: 자연어 질의
+- MCP tool 'natural_language_query'("사용자 정보를 복잡한 조건으로 조회해줘")
+
+"""
 
 # ------------------------------------------------------------------------------
 # 클래스: AgentWrapper
@@ -79,11 +116,13 @@ class AgentWrapper:
         self.agent = LlmAgent(
             model=local_llama_model,  # agent를 구동할 모델 선택
             name="mysql_assistant",
-            instruction="당신은 사용자의 질문에 친절하게 답변하는 AI 비서입니다. MySQL 데이터베이스 관련 작업을 도와드립니다.",
+            instruction=SYSTEM_PROMPT,
             tools=toolsets
         )
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장
-
+        # =생성한 에이전트 객체를 반드시 'root_agent' 라는 이름의 변수에 할당합니다.
+        # ADK는 이 변수 이름을 기준으로 에이전트를 찾습니다.
+        self.root_agent = self.agent
 
     async def _load_toolsets(self):
         """
@@ -98,6 +137,9 @@ class AgentWrapper:
             agent에서 사용할 준비가 된 MCPToolset 객체 목록.
         """
         config = read_config_json()  # 설정 파일에서 서버 정보 로드
+        
+        print("\n\n========== MCP 서버 정보:", config.get("mcpServers", {}))
+        
         toolsets = []
 
         for name, server in config.get("mcpServers", {}).items():
@@ -147,3 +189,45 @@ class AgentWrapper:
 
         # 취소 및 정리가 완료되도록 작은 지연
         await asyncio.sleep(1.0)
+        
+# 전역 변수로 root_agent 선언
+root_agent = None
+
+async def initialize_agent():
+    """에이전트를 초기화하고 root_agent를 설정합니다."""
+    global root_agent
+    agent_wrapper = AgentWrapper()
+    await agent_wrapper.build()
+    root_agent = agent_wrapper.agent
+    return agent_wrapper
+
+# 비동기 초기화를 위한 함수
+def get_root_agent():
+    """root_agent를 반환합니다. 초기화가 완료된 후에만 사용해야 합니다."""
+    global root_agent
+    if root_agent is None:
+        raise RuntimeError("에이전트가 아직 초기화되지 않았습니다. initialize_agent()를 먼저 호출하세요.")
+    return root_agent
+
+# 모듈 레벨에서 root_agent 변수 설정
+# ADK가 이 변수를 찾을 수 있도록 해야 함
+try:
+    # 기본 LlmAgent 생성 (도구 없이)
+    from google.adk.agents.llm_agent import LlmAgent
+    from google.adk.models.lite_llm import LiteLlm
+    
+    local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
+    
+    root_agent = LlmAgent(
+        model=local_llama_model,
+        name="mysql_assistant",
+        instruction=SYSTEM_PROMPT,
+        tools=[]  # 빈 도구 리스트로 시작
+    )
+    
+    print("기본 에이전트가 생성되었습니다. 도구는 런타임에 로드됩니다.")
+    
+except Exception as e:
+    print(f"에이전트 초기화 실패: {e}")
+    # 에러가 발생해도 root_agent 변수는 존재해야 함
+    pass
