@@ -11,6 +11,8 @@ from typing import Any, Dict, List
 from mcp.server.fastmcp import FastMCP
 
 from database import db_manager
+from ai_provider import ai_manager
+from http_server import make_system_prompt
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -101,35 +103,87 @@ async def execute_sql(sql: str) -> Dict[str, Any]:
         logger.error(f"SQL 실행 실패: {e}")
         return {"error": str(e), "status": "failed"}
 
-@mcp.tool()
-async def natural_language_query(query: str) -> Dict[str, Any]:
+@mcp.tool(description="사용자의 자연어 쿼리를 실행합니다.", title="자연어 쿼리 실행")
+async def natural_language_query(question: str) -> Dict[str, Any]:
     """자연어로 데이터베이스 쿼리를 실행합니다.
     
     Args:
-        query: 자연어로 된 쿼리 (예: "사용자 테이블에서 모든 데이터를 가져와줘")
+        question: 자연어로 된 쿼리 (예: "사용자 테이블에서 모든 데이터를 가져와줘")
         
     Returns:
         Dict[str, Any]: 쿼리 실행 결과
     """
     try:
-        if not query:
-            raise ValueError("자연어 쿼리가 제공되지 않았습니다.")
+        if not question:
+            raise ValueError("사용자의 질의 내용이 제공되지 않았습니다.")
         
-        # AI를 통한 자연어 쿼리 처리 (향후 구현)
-        # result = ai_manager.process_natural_language_query(query)
-        
-        # 임시로 직접 SQL 실행 (실제로는 AI가 SQL을 생성해야 함)
-        result = {"message": "자연어 쿼리 기능은 현재 개발 중입니다.", "query": query}
+        if question.isdigit() or len(question.strip()) < 5:
+            raise ValueError("질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
+
+        result = await _natural_language_query(question)
+
         logger.debug(f"자연어 쿼리 처리 결과: {result}")
         return result
     except Exception as e:
         logger.error(f"자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}
 
-if __name__ == "__main__":
+async def _natural_language_query(question: str):
+    """기존 방식으로 자연어를 SQL로 변환합니다 (system prompt에 스키마 정보 포함)."""
+    try:
+        # 데이터베이스 스키마 정보 가져오기
+        db_info = db_manager.get_database_info()
+        if "error" in db_info:
+            logger.error(f"데이터베이스 연결 오류: {db_info['error']}")
+            raise ValueError(f"데이터베이스 연결 오류: {db_info['error']}")
+        
+        # 현재 tools 지원 모델이 없으므로 기존 방식으로 스키마 정보 수집
+        schema_info = ""
+        # devdb 데이터베이스의 실제 테이블들만 사용     
+        user_tables = [table for table in db_info.get("tables", []) 
+                      if not table.startswith('INFORMATION_SCHEMA') and 
+                         not table.startswith('mysql') and 
+                         not table.startswith('performance_schema') and
+                         not table.startswith('sys')]
+        
+        # 모든 사용자 테이블의 스키마 정보를 사용               
+        for table_name in user_tables:
+            try:
+                schema = db_manager.get_table_schema(table_name)
+                schema_info += f"\n\n### {table_name} 테이블 스키마\n"
+                schema_info += f"```sql\n{schema}\n```\n"
+            except Exception as e:      
+                logger.error(f"테이블 스키마 조회 실패: {e}")
+                continue
+        
+        # 스키마 정보를 시스템 프롬프트에 포함
+        system_prompt = make_system_prompt(
+            database_name=db_info.get("database_name", "devdb"),
+            schema_info=schema_info,
+            question=question,
+            use_tools=False
+        )
+        
+        # AI 응답 생성                                  
+        response = await ai_manager.generate_response(system_prompt)
+        logger.debug(f"AI 응답 생성 결과: {response}")
+        
+        # 응답 형식 검증
+        if not response.get("content"):
+            raise ValueError("AI 응답에 content가 없습니다.")   
+
+    except Exception as e:
+        logger.error(f"자연어 쿼리 처리 실패: {e}")
+        return {"error": str(e), "status": "failed"}    
     
+def run(self):
+    """MCP 서버를 실행합니다."""
     logger.info("MySQL Hub MCP 서버를 시작합니다...")
     logger.info(f"MCP 서버 호스트: {config.MCP_SERVER_HOST}")
     logger.info(f"MCP 서버 포트: {config.MCP_SERVER_PORT}")
     
     mcp.run("streamable-http")
+
+
+if __name__ == "__main__":
+    run()

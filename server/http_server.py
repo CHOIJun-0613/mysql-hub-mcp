@@ -335,7 +335,10 @@ async def _natural_language_query_with_tools(question: str):
             # Tool 호출이 없고 content도 없는 경우 처리
             if not response.get("tool_calls") and not response.get("content"):
                 logger.warning("AI 응답에 Tool 호출과 content가 모두 없습니다. 기존 방식으로 전환")
-                return await _natural_language_query_legacy(question)
+                return Response(
+                    success=False,
+                    error="AI 응답에 Tool 호출과 content가 모두 없습니다."
+                )
             
             # Tool 호출이 없으면 최종 SQL 응답
             if "tool_calls" not in response or not response["tool_calls"]:
@@ -343,8 +346,10 @@ async def _natural_language_query_with_tools(question: str):
                 
                 # AI 응답이 실제 SQL 쿼리인지 더 엄격하게 확인
                 if not sql_query:
-                    logger.warning("AI 응답이 비어있습니다. 기존 방식으로 전환")
-                    return await _natural_language_query_legacy(question)
+                    return Response(
+                        success=False,
+                        error="AI 응답이 비어있습니다."
+                    )
                 
                 # 에러 메시지나 설명 텍스트인지 확인
                 error_indicators = [
