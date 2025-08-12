@@ -9,6 +9,7 @@
 
 import asyncio
 from rich import print  # 컬러 터미널 로깅을 위해 사용
+from dotenv import load_dotenv
 
 # ADK의 내장 LLM agent 클래스
 from google.adk.agents.llm_agent import LlmAgent
@@ -25,6 +26,29 @@ from google.adk.models.lite_llm import LiteLlm
 
 # config.json 파일을 읽기 위한 유틸리티 함수
 from .utilities import read_config_json
+
+# ------------------------------------------------------------------------------
+# 설정 상수
+# ------------------------------------------------------------------------------
+
+# ADK 앱 식별자 (세션이나 도구를 등록할 때 사용)
+APP_NAME = "mysql_assistant"
+
+# 현재 세션을 위한 고유 사용자 ID
+USER_ID = "mysql_assistant_001"
+
+# 고유 세션 ID (여러 세션을 재개하거나 구분하는 데 도움이 됨)
+SESSION_ID = "session_001"
+
+#클라이언트가 사용할 수 있는 도구 세트 정의
+
+READ_ONLY_TOOLS = [
+    'execute_sql',
+    'natural_language_query',
+    'get_database_info',
+    'get_table_list',
+    'get_table_schema'
+]
 
 SYSTEM_PROMPT = """
 ## 당신은 사용자의 질문에 친절하게 답변하는 AI 비서입니다. 
@@ -63,6 +87,8 @@ SYSTEM_PROMPT = """
 - MCP tool 'natural_language_query'("사용자 정보를 복잡한 조건으로 조회해줘")
 
 """
+# 환경 변수 로드
+load_dotenv()
 
 # ------------------------------------------------------------------------------
 # 클래스: AgentWrapper
@@ -85,12 +111,11 @@ class AgentWrapper:
             tool_filter (list[str] or None): 허용할 도구 이름의 선택적 목록.
                                              지정된 경우 이 도구들만 로드됩니다.
         """
-        self.tool_filter = tool_filter
+        self.tool_filter = READ_ONLY_TOOLS
         self.agent = None          # 빌드 후 최종 LlmAgent를 보관
-        self._toolsets = []        # 나중에 정리를 위해 모든 로드된 도구세트 저장
+        self._toolsets = []        # 빈 리스트로 초기화
 
-
-    async def build(self):
+    def build(self):
         """
         LlmAgent를 빌드합니다:
         - 설정에 나열된 모든 MCP 서버에 연결
@@ -99,32 +124,32 @@ class AgentWrapper:
 
         `self.agent`를 사용하기 전에 호출되어야 합니다.
         """
-        toolsets = await self._load_toolsets()
+        toolsets = self._load_toolsets()
 
-        # 로드된 도구세트로 ADK LLM Agent 구성
-        # self.agent = LlmAgent(
-        #     model="gemini-2.0-flash",  # agent를 구동할 모델 선택
-        #     name="enterprise_assistant",
-        #     instruction="Assist the user with filesystem and MCP server tasks.",
-        #     tools=toolsets
-        # )
-        
-       # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
-        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
-        local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
-        
+        #로드된 도구세트로 ADK LLM Agent 구성
         self.agent = LlmAgent(
-            model=local_llama_model,  # agent를 구동할 모델 선택
+            model="gemini-2.0-flash",  # agent를 구동할 모델 선택
             name="mysql_assistant",
             instruction=SYSTEM_PROMPT,
             tools=toolsets
         )
+        
+       # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
+        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
+        # local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
+        
+        # self.agent = LlmAgent(
+        #     model=local_llama_model,  # agent를 구동할 모델 선택
+        #     name="mysql_assistant",
+        #     instruction=SYSTEM_PROMPT,
+        #     tools=toolsets
+        # )
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장
         # =생성한 에이전트 객체를 반드시 'root_agent' 라는 이름의 변수에 할당합니다.
         # ADK는 이 변수 이름을 기준으로 에이전트를 찾습니다.
-        self.root_agent = self.agent
+        #self.root_agent = self.agent
 
-    async def _load_toolsets(self):
+    def _load_toolsets(self):
         """
         config.json에서 MCP 서버 정보를 읽고 각각에서 도구세트를 로드합니다.
 
@@ -137,9 +162,7 @@ class AgentWrapper:
             agent에서 사용할 준비가 된 MCPToolset 객체 목록.
         """
         config = read_config_json()  # 설정 파일에서 서버 정보 로드
-        
-        print("\n\n========== MCP 서버 정보:", config.get("mcpServers", {}))
-        
+         
         toolsets = []
 
         for name, server in config.get("mcpServers", {}).items():
@@ -149,11 +172,15 @@ class AgentWrapper:
                     conn = StreamableHTTPServerParams(url=server["url"])
 
                 elif server.get("type") == "stdio":
-                    conn = StdioConnectionParams(
-                        command=server["command"],
-                        args=server["args"],
-                        timeout=5
-                    )
+                    # StdioConnectionParams 사용법이 변경되었을 수 있음
+                    # 임시로 주석 처리
+                    # conn = StdioConnectionParams(
+                    #     command=server["command"],
+                    #     args=server["args"],
+                    #     timeout=5
+                    # )
+                    print(f"[yellow]⚠️  STDIO 서버 '{name}'는 현재 지원되지 않습니다.[/yellow]")
+                    continue
                 else:
                     raise ValueError(f"[red]❌ 설정에서 알 수 없는 서버 유형: '{server['type']}'[/red]")
 
@@ -163,10 +190,8 @@ class AgentWrapper:
                     tool_filter=self.tool_filter
                 )
 
-                # 도구 목록 가져오기 및 깔끔하게 출력
-                tools = await toolset.get_tools()
-                tool_names = [tool.name for tool in tools]
-                print(f"[bold green]✅ 서버 [cyan]'{name}'[/cyan]에서 로드된 도구:[/bold green] {tool_names}")
+                # Fetch tool list and print it nicely
+                print(f"[bold green]✅ Tools loaded from server [cyan]'{name}'[/cyan]:[/bold green]")
 
                 toolsets.append(toolset)
 
@@ -190,44 +215,7 @@ class AgentWrapper:
         # 취소 및 정리가 완료되도록 작은 지연
         await asyncio.sleep(1.0)
         
-# 전역 변수로 root_agent 선언
-root_agent = None
 
-async def initialize_agent():
-    """에이전트를 초기화하고 root_agent를 설정합니다."""
-    global root_agent
-    agent_wrapper = AgentWrapper()
-    await agent_wrapper.build()
-    root_agent = agent_wrapper.agent
-    return agent_wrapper
-
-# 비동기 초기화를 위한 함수
-def get_root_agent():
-    """root_agent를 반환합니다. 초기화가 완료된 후에만 사용해야 합니다."""
-    global root_agent
-    if root_agent is None:
-        raise RuntimeError("에이전트가 아직 초기화되지 않았습니다. initialize_agent()를 먼저 호출하세요.")
-    return root_agent
-
-# 모듈 레벨에서 root_agent 변수 설정
-# ADK가 이 변수를 찾을 수 있도록 해야 함
-try:
-    # 기본 LlmAgent 생성 (도구 없이)
-    from google.adk.agents.llm_agent import LlmAgent
-    from google.adk.models.lite_llm import LiteLlm
-    
-    local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
-    
-    root_agent = LlmAgent(
-        model=local_llama_model,
-        name="mysql_assistant",
-        instruction=SYSTEM_PROMPT,
-        tools=[]  # 빈 도구 리스트로 시작
-    )
-    
-    print("기본 에이전트가 생성되었습니다. 도구는 런타임에 로드됩니다.")
-    
-except Exception as e:
-    print(f"에이전트 초기화 실패: {e}")
-    # 에러가 발생해도 root_agent 변수는 존재해야 함
-    pass
+agent_wrapper = AgentWrapper()
+agent_wrapper.build()
+root_agent = agent_wrapper.agent
