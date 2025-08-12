@@ -1,5 +1,5 @@
 def main():
-    print("Hello from adk-client!")
+    print("Hello from adk-agents!")
 
 
 if __name__ == "__main__":

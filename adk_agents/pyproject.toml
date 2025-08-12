@@ -1,10 +1,9 @@
 [project]
-name = "adk-client"
+name = "adk-agents"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "google-adk>=1.10.0",
-    "litellm>=1.75.4",
 ]

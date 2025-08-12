@@ -18,6 +18,6 @@ members = [
     "client",
     "server",
     "bridge",
-    "agent",
+    "adk_agents",
     "adk_client",
 ]

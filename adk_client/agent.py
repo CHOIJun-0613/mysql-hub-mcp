@@ -26,6 +26,11 @@ from google.adk.models.lite_llm import LiteLlm
 # config.json 파일을 읽기 위한 유틸리티 함수
 from .utilities import read_config_json
 
+# 모델 이름 설정
+GEMINI_MODEL_NAME = "gemini-2.0-flash"
+QWEN_MODEL_NAME = "ollama/qwen2.5-coder:latest"
+LLAMA_MODEL_NAME = "ollama/llama3.1:8b"
+
 SYSTEM_PROMPT = """
 ## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
 
@@ -34,6 +39,7 @@ SYSTEM_PROMPT = """
 - **한 번에 하나의 도구만 호출하세요**
 - **사용자 질문에 대해 단계별로 진행하세요**
 - **각 단계가 완료되면 다음 단계로 진행하세요**
+- **사용자의 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요**
 
 ## 📋 도구 사용 순서 (반드시 이 순서를 따르세요)
 
@@ -47,7 +53,10 @@ SYSTEM_PROMPT = """
 ### 3단계: SQL 쿼리 작성 및 실행
 4. 스키마 정보를 바탕으로 **직접 SQL 문을 작성**하세요
 5. `execute_sql("SQL문")` - 작성한 SQL 실행
-6. SQL 호출 결과를 확인하고 사용자에게 결과 반환
+6. `execute_sql("SQL문")`을 호출했으면 natural_language_query(query)를 호출하지 마세요요 
+6. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
+7. 사용자에게 결과를 표시할 때는 테이블 형태로 표시하세요
+
 
 ## 🔧 사용 가능한 도구
 - `get_database_info()` - 데이터베이스 정보 확인
@@ -65,18 +74,20 @@ SYSTEM_PROMPT = """
 3. 테이블 목록에서 "users" 테이블을 찾음
 4. `get_table_schema("users")` 호출
 5. 스키마 정보를 보고 `execute_sql("SELECT * FROM users")` 호출
-6. SQL 호출 결과를 확인하고 사용자에게 결과 반환
+6. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
+7. 사용자 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요
 
 ## ❌ 금지사항
 - 같은 도구를 연속으로 호출하지 마세요
 - 불필요한 반복을 하지 마세요
 - 한 번에 여러 도구를 동시에 호출하지 마세요
 - `get_table_list()`를 여러 번 호출하지 마세요
-- `execute_sql()` 호출 후 결과를 확인하고 사용자에게 결과 반환하고 끝내세요
+- `execute_sql()` 호출 후 결과를 확인하고 사용자에게 그 결과를 반환하고 끝내세요
+- 'execute_sql()' 호출 후 'natural_language_query()'를 호출하지 마세요
 
 ## ✅ 올바른 응답 패턴
 각 도구 호출 후 결과를 확인하고, 다음 단계로 진행하세요. 모든 정보를 수집한 후 최종 SQL을 작성하고 실행하세요.
-
+SQL 쿼리 결과는 테이블 형태로 표시하세요
 사용자의 질문에 답변하기 위해 위 순서를 따라 진행하세요.
 """
 
@@ -118,24 +129,24 @@ class AgentWrapper:
         toolsets = await self._load_toolsets()
 
         # 로드된 도구세트로 ADK LLM Agent 구성
-        # self.agent = LlmAgent(
-        #     model="gemini-2.0-flash",  # agent를 구동할 모델 선택
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
-        
-        # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
-        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
-        #local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
-        local_llama_model = LiteLlm(model="ollama/qwen2.5-coder:latest")
-        
         self.agent = LlmAgent(
-            model=local_llama_model,  # agent를 구동할 모델 선택
+            model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
             name="mysql_assistant",
             instruction=SYSTEM_PROMPT,
             tools=toolsets
         )
+        
+        # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
+        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
+        #local_llama_model = LiteLlm(model=LLAMA_MODEL_NAME)
+        llmodel = LiteLlm(model=QWEN_MODEL_NAME)
+        
+        # self.agent = LlmAgent(
+        #     model=llmodel,  # agent를 구동할 모델 선택
+        #     name="mysql_assistant",
+        #     instruction=SYSTEM_PROMPT,
+        #     tools=toolsets
+        # )
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장
         # =생성한 에이전트 객체를 반드시 'root_agent' 라는 이름의 변수에 할당합니다.
         # ADK는 이 변수 이름을 기준으로 에이전트를 찾습니다.
@@ -154,8 +165,6 @@ class AgentWrapper:
             agent에서 사용할 준비가 된 MCPToolset 객체 목록.
         """
         config = read_config_json()  # 설정 파일에서 서버 정보 로드
-        
-        print("\n\n========== MCP 서버 정보:", config.get("mcpServers", {}))
         
         toolsets = []
 

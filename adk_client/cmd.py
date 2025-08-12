@@ -6,10 +6,18 @@
 # MCP 도구 서버에 연결된 LLM agent와 상호작용할 수 있게 합니다.
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# 임포트
+# ------------------------------------------------------------------------------
+
 import asyncio
 import logging
+
+# Rich 라이브러리에서 컬러 터미널 출력을 위한 print 함수
+from rich import print
+
+# MCPClient 클래스 임포트
 from .client import MCPClient
-from .utilities import print_json_response
 
 # ------------------------------------------------------------------------------
 # 설정 상수
@@ -75,13 +83,33 @@ async def chat_loop():
             if user_input.strip().lower() in ["quit", ":q", "exit"]:
                 print("👋 세션을 종료합니다. 안녕히 가세요!")
                 break
-
+            if user_input.strip().__len__() <= 5:
+                print("👋 입력이 너무 짧습니다. 5자 이상 입력해주세요.")
+                continue
+            
             i = 0
             # 입력 작업을 agent에 보내고 응답 스트리밍
             async for event in await client.send_task(user_input):
                 i += 1
-                print_json_response(event, f"📦 이벤트 #{i}")
-
+                                
+                # function call 이벤트 감지 및 출력
+                function_calls = event.get_function_calls()
+                if function_calls:
+                    for func_call in function_calls:
+                        #print(f"🔍 FunctionCall 객체 속성들: {dir(func_call)}")
+                        # Pydantic 모델이므로 직접 속성에 접근
+                        func_name = getattr(func_call, "name", "알수없음")
+                        print(f"📦 이벤트 #{i} : [bold yellow]{func_name} - call[/bold yellow]")
+                
+                # function response 이벤트 감지 및 출력
+                function_responses = event.get_function_responses()
+                if function_responses:
+                    for func_response in function_responses:
+                        #print(f"🔍 FunctionResponse 객체 속성들: {dir(func_response)}")
+                        # Pydantic 모델이므로 직접 속성에 접근
+                        func_name = getattr(func_response, "name", "알수없음")
+                        print(f"📦 이벤트 #{i} : [bold green]{func_name} - response[/bold green]")
+                
                 # 최종 응답을 받으면 출력하고 루프 중단
                 if hasattr(event, "is_final_response") and event.is_final_response():
                     print(f"\n🧠 Agent 응답:\n------------------------\n{event.content.parts[0].text}\n")
