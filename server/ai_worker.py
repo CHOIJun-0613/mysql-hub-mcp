@@ -1,5 +1,6 @@
 
 import re
+import json
 import logging
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
@@ -12,9 +13,20 @@ from ai_provider import ai_manager
 from common import Response
 
 
+async def get_table_list():
+    return db_manager.get_table_list()
+
+async def get_table_schema(table_name: str):
+    return db_manager.get_table_schema(table_name)
+
+# LLM이 반환한 함수 이름(문자열)을 실제 실행할 Python 함수와 연결합니다.
+available_tools = {
+    "get_table_list": get_table_list,
+    "get_table_schema": get_table_schema,
+}
 
 # Tool 정의
-tools = [
+tools_definition = [
     {
         "type": "function",
         "function": {
@@ -64,7 +76,7 @@ async def natural_language_query_work(question: str, use_tools: bool):
         # Tool 사용 여부에 따라 분기 처리
         if use_tools:
             # Tool 사용 방식
-            return await _natural_language_query_with_tools(question)
+            return await _run_agentic_query(question)
         else:
             # 기존 방식 - system prompt에 스키마 정보 포함
             return await _natural_language_query_legacy(question)
@@ -75,7 +87,176 @@ async def natural_language_query_work(question: str, use_tools: bool):
             success=False,
             error=f"자연어 쿼리 처리 중 오류가 발생했습니다: {e}"
         )
+        
+async def _run_agentic_query(question: str):
+    """Tool을 사용하여 자연어를 SQL로 변환합니다."""
+    try:
+        
+        # Tool 사용 모드를 위한 system prompt 구성
+        system_prompt = make_system_prompt('', '', question, True)
+        
+        # 메시지 히스토리 초기화
+        # 1. 초기 메시지 설정 (시스템 프롬프트 + 사용자 질문)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user","content": question}
+        ]
 
+        logger.debug(f"초기 messages: \n{messages}\n")
+        logger.debug(f"tool_definition: \n{tools_definition}\n")
+        logger.info(f"자연어 질문: {question}")
+        logger.info(f"Tool 방식으로 처리 시작")
+        
+        # 최대 Tool 호출 횟수 제한 (무한 루프 방지)
+        max_tool_calls = 5
+        tool_call_count = 0
+        
+        # 2. 에이전트 루프 시작 (최대 5번의 도구 호출 허용)
+        while tool_call_count < max_tool_calls:
+            logger.info("\n\n🚨===== AI API 호출 시작...\n")
+            # AI 응답 생성
+            response = await ai_manager.generate_response_with_tools(messages, tools_definition)
+            logger.info(f"\n🚨===== AI 응답(response): \n{response}\n")
+            if "error" in response:
+                logger.error(f"AI 응답 생성 실패: {response['error']}")
+                return Response(
+                    success=False,
+                    error=f"AI 응답 생성 실패: {response['error']}"
+                )
+
+            
+            # AI 응답 구조 검증
+            if not isinstance(response, dict):
+                logger.error(f"AI 응답이 올바른 형식이 아닙니다: {type(response)}")
+                return Response(
+                    success=False,
+                    error="AI 응답 형식이 올바르지 않습니다."
+                )
+
+            response_messages = response.get("messages","")
+            logger.debug(f"AI 응답[messages]: \n{response_messages}\n")
+            
+            if response_messages:
+                messages.append(response_messages)
+                            
+            # 4. LLM이 도구 사용 대신 최종 답변을 한 경우 -> 루프 종료
+            if "tool_calls" not in response or not response["tool_calls"]: 
+                sql_query = response.get("content", "")
+                logger.info(f"\n✅ AI 응답 최종 결과(content): \n{sql_query}\n")
+                # AI 응답이 실제 SQL 쿼리인지 더 엄격하게 확인
+                if not sql_query:
+                    return Response(
+                        success=False,
+                        error="AI 응답이 비어있습니다."
+                    )
+                
+                # 에러 메시지나 설명 텍스트인지 확인
+                error_indicators = [
+                    "질문이 불명확합니다",
+                    "응답 생성 중 오류",
+                    "죄송합니다",
+                    "이해할 수 없습니다",
+                    "모호합니다",
+                    "다시 질문해 주세요"
+                ]
+                
+                if any(indicator in sql_query for indicator in error_indicators):
+                    return Response(
+                        success=False,
+                        error=f"질문이 불명확합니다: {sql_query}"
+                    )
+                
+                # SQL 키워드가 포함되어 있는지 확인
+                sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
+                if not any(keyword in sql_query.upper() for keyword in sql_keywords):
+                    return Response(
+                        success=False,
+                        error=f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}"
+                    )
+
+                # 마크다운 형식 제거
+                clean_sql = strip_markdown_sql(sql_query)
+                logger.info(f"원본 SQL: {sql_query}")
+                logger.info(f"정리된 SQL: {clean_sql}")
+                
+                # SQL 쿼리 실행
+                try:
+                    result = db_manager.execute_query(clean_sql)
+                    sql_query_result = Response(
+                        success=True,
+                        data={
+                            "sql_query": clean_sql,
+                            "result": result
+                        }
+                    )
+                    logger.info(f"\n\n=====✅ 쿼리 실행 결과: \n{sql_query_result.data}\n")
+                    return sql_query_result
+                except Exception as e:
+                    return Response(
+                        success=False,
+                        error=f"SQL 실행 오류: {e}"
+                    )
+                
+              
+            
+            # 5. LLM이 도구 사용을 요청한 경우 -> 도구 실행
+            tool_calls = response["tool_calls"]
+            logger.debug(f"AI 응답[tool_calls]: \n{tool_calls}\n")
+            logger.info(f"Tool 호출 감지 (횟수: {tool_call_count + 1}): {[tc['function']['name'] for tc in tool_calls]}")
+            
+            for tool_call in tool_calls:
+                func_name = tool_call["function"]["name"]
+                func_args = tool_call["function"]["arguments"]
+                logger.debug(f"Tool 호출 감지 (횟수: {tool_call_count + 1}): {func_name}")
+                logger.debug(f"Tool 호출 인자: {func_args}")
+                
+                if func_name in available_tools:
+                    functoin_to_call = available_tools[func_name]
+                    logger.debug(f"🧠 LLM 요청: 로컬 함수 {func_name}({json.dumps(func_args, ensure_ascii=False)}) 실행")
+                    
+                    try:
+                        #tool_result = await functoin_to_call(**func_args)
+                        if func_name == "get_table_list":
+                            tool_result = db_manager.get_table_list()
+                        elif func_name == "get_table_schema":
+                            table_name = func_args.get("table_name", "")
+                            if table_name:
+                                tool_result = db_manager.get_table_schema(table_name) 
+                            else:
+                                tool_result = "테이블 이름이 제공되지 않았습니다."
+                              
+                        logger.debug(f"🧠 로컬 함수 실행 결과: {tool_result}")
+                        messages.append({
+                            "role": "tool",
+                            #"tool_call_id": tool_call["id"],
+                            "name": func_name,
+                            "content": json.dumps(tool_result),
+                        })
+                    except Exception as e:
+                        logger.error(f"🧠 로컬 함수 실행 오류: {e}")
+                        tool_result = f"Tool 실행 중 오류가 발생했습니다: {e}"
+                        messages.append({
+                            'role': 'tool',
+                            #'tool_call_id': tool_call['id'],
+                            'name': func_name,
+                            'content': json.dumps({"error": str(e)})
+                        })
+                else:
+                    logger.error(f"🧠 알 수 없는 도구 호출출: {func_name}")
+                    
+        # 최대 Tool 호출 횟수 초과
+        return Response(
+            success=False,
+            error=f"Tool 호출 횟수가 최대 제한({max_tool_calls})을 초과했습니다. 질문을 더 구체적으로 작성해주세요."
+        )
+        
+    except Exception as e:
+        logger.error(f"Tool 방식 처리 중 오류: {e}")
+        return Response(
+            success=False,
+            error=f"Tool 방식 처리 중 오류가 발생했습니다: {e}"
+        )
+        
 async def _natural_language_query_with_tools(question: str):
     """Tool을 사용하여 자연어를 SQL로 변환합니다."""
     try:
@@ -96,7 +277,7 @@ async def _natural_language_query_with_tools(question: str):
         ]
 
         logger.debug(f"초기 messages: \n{messages}\n")
-        logger.debug(f"tools: \n{tools}\n")
+        logger.debug(f"tools_definition: \n{tools_definition}\n")
         logger.info(f"자연어 질문: {question}")
         logger.info(f"Tool 방식으로 처리 시작")
         
@@ -106,7 +287,7 @@ async def _natural_language_query_with_tools(question: str):
         
         while tool_call_count < max_tool_calls:
             # AI 응답 생성
-            response = await ai_manager.generate_response_with_tools(messages, tools)
+            response = await ai_manager.generate_response_with_tools(messages, tools_definition)
             
             if "error" in response:
                 logger.error(f"AI 응답 생성 실패: {response['error']}")
@@ -386,9 +567,28 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
     """
     default_prompt = """
 당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
+"""
+    
+    default_prompt_with_tools = """
+당신은 사용자의 자연어 질문을 분석하여, 도구를 사용해 필요한 정보를 수집하고 최종적으로 완벽한 MySQL 쿼리를 생성하는 AI 에이전트입니다.
 
+## 지시사항
+1.  **사고(Thinking) 단계:** 먼저 사용자의 질문을 분석하여 어떤 정보가 필요한지 계획을 세웁니다.
+2.  **도구 사용(Tool Use) 단계:** 계획에 따라 필요한 도구를 최소한으로 사용합니다.
+    - **1순위:** `get_table_list`를 호출하여 테이블 목록을 파악합니다.
+    - **2순위:** 질문과 가장 관련성이 높은 테이블 1~3개를 추론하고, 해당 테이블에 대해서만 `get_table_schema`를 호출하여 구조를 파악합니다.
+    - **3순위:** 모든 정보가 수집되었다고 판단되면, SQL을 생성합니다.
+3.  **최종 답변(Final Answer) 단계:**
+    - 모든 정보 수집이 완료되면, 분석한 내용을 바탕으로 **순수한 SQL 쿼리 하나만** 생성합니다.
+    - 마크다운(```), 설명, 주석 없이 오직 SQL 쿼리만 반환해야 합니다.
+    - SQL 쿼리는 반드시 세미콜론(;)으로 끝나야 합니다.
+    - 최종 답변은 반드시 순수한 SQL 쿼리만 반환해야 합니다.
+
+
+"""
+    basic_rule_prompt = """
 ⚠️ 매우 중요한 규칙:
-1. 순수한 SQL 쿼리만 반환하세요
+1. 최종 답변은 반드시 순수한 SQL 쿼리만 반환해야 합니다.
 2. 마크다운 형식(```)을 절대 사용하지 마세요
 3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
 4. 쿼리 1개만 반환하세요
@@ -402,22 +602,6 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 - MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
 - 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
 - 예시: SELECT * FROM (SELECT * FROM UserInfo WHERE CreateDate >= '2010-01-01' LIMIT 0,10) AS temp_tbl;   
-"""
-    
-    default_prompt_with_tools = """
-당신은 사용자의 자연어 질문을 MySQL SQL로 변환하는 전문가입니다.
-
-🚨 도구 사용 모드에서는 다음 규칙을 따르세요:
-1. 먼저 제공된 도구를 사용하여 필요한 정보를 수집하세요
-2. 모든 도구 사용이 완료된 후에만 SQL 쿼리를 생성하세요
-3. 도구를 사용하지 않고 바로 SQL을 생성하지 마세요
-4. SQL 생성 시에는 순수한 SQL 쿼리만 반환하세요
-5. 마크다운 형식(```)을 절대 사용하지 마세요
-6. 세미콜론(;)으로 끝내세요
-
-⚠️ 절대 금지: 도구를 사용하지 않고 바로 SQL을 생성하지 마세요!
-
-💡 중요: 질문의 맥락을 고려하여 적절한 테이블을 선택하세요!
 """
     database_prompt = """
 
@@ -435,29 +619,15 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 
 === tool 사용 순서 (절대적으로 필수):
 🚨 첫 번째 단계: 반드시 get_table_list()를 호출하여 사용 가능한 테이블 목록을 확인하세요
-🚨 두 번째 단계: get_table_list()로 조회한 모든 테이블의 스키마를 get_table_schema("테이블명")로 조회하세요
-🚨 세 번째 단계: 스키마 정보를 확인한 후에만 SQL 쿼리를 생성하세요
-
-⚠️ 절대 금지: 도구를 사용하지 않고 바로 SQL을 생성하지 마세요!
+🚨 두 번째 단계: 질문과 가장 관련성이 높은 테이블 1~3개를 추론하고 호출하여
+🚨 세 번째 단계: 추론한 테이블들에 대해서 테이블의 스키마를 get_table_schema("테이블명")로 조회하세요
+🚨 네 번째 단계: 스키마 정보를 확인한 후에만 SQL 쿼리를 생성하세요
 
 🚫 금지사항:
 - 테이블 목록을 확인(get_table_list)하지 않고 SQL을 생성하지 마세요
-- get_table_list() 호출 후 반드시 get_table_schema()를 호출해야 합니다
 - 존재하지 않는 테이블 이름을 사용하지 마세요
 - 존재하지 않는 컬럼 이름을 사용하지 마세요
 - 스키마 정보 없이 SQL을 생성하지 마세요
-
-✅ 올바른 예시:
-1단계: get_table_list() 호출 → 테이블 목록 확인
-2단계: get_table_list() 조회한 모든 테이블에 대해 get_table_schema("테이블명") 호출  
-3단계: 스키마 정보를 바탕으로 SQL 생성
-
-⚠️ 중요: get_table_list() 호출 후에는 반드시 get_table_schema()를 호출해야 합니다!
-
-💡 팁: get_table_list() 호출 시 시스템이 자동으로 첫 번째 사용자 테이블의 스키마를 제공합니다.
-하지만 질문과 관련된 적절한 테이블을 선택하여 get_table_schema("테이블명")을 직접 호출하세요.
-테이블명이 명확하지 않으면 여러 테이블의 스키마를 확인하여 가장 적합한 테이블을 찾으세요.
-
 """
     close_prompt = """
 
@@ -473,12 +643,12 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 """
 
     if use_tools:
-        temp_prompt = default_prompt_with_tools + use_tools_prompt + close_prompt_with_tools
+        temp_prompt = default_prompt_with_tools +basic_rule_prompt+ use_tools_prompt + close_prompt_with_tools
         prompt = temp_prompt.format(
-            tool_list=tools,
+            tool_list=tools_definition,
             question=question)
     else:
-        temp_prompt = default_prompt + database_prompt + close_prompt
+        temp_prompt = default_prompt + basic_rule_prompt + database_prompt + close_prompt
         prompt = temp_prompt.format(
             database_name=database_name,
             schema_info=schema_info,
