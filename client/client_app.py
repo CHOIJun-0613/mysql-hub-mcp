@@ -215,7 +215,7 @@ async def main():
     parser.add_argument("--question", help="자연어 질문 (natural_language_query 도구와 함께 사용)")
     parser.add_argument("--table", help="테이블 이름 (get_table_schema 도구와 함께 사용)")
     parser.add_argument("--list-tools", action="store_true", help="사용 가능한 도구 목록을 표시하고 종료")
-    parser.add_argument("--server-url", default="http://localhost:8000", help="서버 URL (기본값: http://localhost:8000)")
+    parser.add_argument("--server-url", default="http://localhost:9000", help="서버 URL (기본값: http://localhost:9000)")
     args = parser.parse_args()
     
     logger.info(f"서버 URL: {args.server_url}")

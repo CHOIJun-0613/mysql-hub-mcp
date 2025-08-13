@@ -11,6 +11,39 @@ from dotenv import load_dotenv
 # .env 파일 로드
 load_dotenv()
 
+def setup_logging_immediate():
+    """모듈 임포트 시점에 즉시 로깅을 설정합니다."""
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    log_format = os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    
+    # 로그 디렉토리 생성
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # 로그 파일명 (날짜 포함)
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    log_filename = f"logs/server-{today}.log"
+    
+    # 로깅 설정
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_filename, encoding='utf-8')
+        ]
+    )
+    
+    # 외부 라이브러리의 로그 레벨 조정
+    # logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    # logging.getLogger("fastapi").setLevel(logging.WARNING)
+    # logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+
+# 즉시 로깅 설정 실행
+setup_logging_immediate()
+
 class Config:
     """설정 클래스"""
     
@@ -56,32 +89,9 @@ class Config:
     
     @classmethod
     def setup_logging(cls):
-        """로깅 설정을 초기화합니다."""
-        import os
-        from datetime import datetime
-        
-        # 로그 디렉토리 생성
-        log_dir = "logs"
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-        
-        # 로그 파일명 (날짜 포함)
-        today = datetime.now().strftime("%Y%m%d")
-        log_filename = f"logs/server-{today}.log"
-        
-        logging.basicConfig(
-            level=getattr(logging, cls.LOG_LEVEL.upper()),
-            format=cls.LOG_FORMAT,
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler(log_filename, encoding='utf-8')  # UTF-8 인코딩 명시
-            ]
-        )
-        
-        # 외부 라이브러리의 로그 레벨 조정
-        logging.getLogger("uvicorn").setLevel(logging.WARNING)
-        logging.getLogger("fastapi").setLevel(logging.WARNING)
-        logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+        """로깅 설정을 초기화합니다. (기존 호환성을 위해 유지)"""
+        # 이미 설정되어 있으므로 아무것도 하지 않음
+        pass
 
 # 전역 설정 인스턴스
 config = Config() 

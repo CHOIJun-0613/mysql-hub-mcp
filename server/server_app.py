@@ -12,7 +12,7 @@ from typing import Optional
 from config import config
 from database import db_manager
 from ai_provider import ai_manager
-from mcp_server import mcp_server
+from mcp_server import run_mcp_server
 from http_server import run_http_server
 
 logger = logging.getLogger(__name__)
@@ -32,8 +32,8 @@ class ServerApp:
             
             uvicorn_config = uvicorn.Config(
                 app,
-                host=config.SERVER_HOST,
-                port=config.SERVER_PORT,
+                host=config.HTTP_SERVER_HOST,
+                port=config.HTTP_SERVER_PORT,
                 log_level=config.LOG_LEVEL.lower()
             )
             server = uvicorn.Server(uvicorn_config)
@@ -45,7 +45,7 @@ class ServerApp:
     async def start_mcp_server(self):
         """MCP 서버를 시작합니다."""
         try:
-            await mcp_server.run()
+            await run_mcp_server()
         except Exception as e:
             logger.error(f"MCP 서버 시작 실패: {e}")
             raise
@@ -124,6 +124,9 @@ def main():
         logger.info("MySQL Hub MCP Server를 시작합니다.")
         logger.info(f"실행 모드: {args.mode}")
         logger.info(f"AI Provider: {ai_manager.get_current_provider()}")
+        logger.info(f"HTTP 서버: http://{config.HTTP_SERVER_HOST}:{config.HTTP_SERVER_PORT}")
+        logger.info(f"log level : {config.LOG_LEVEL}")
+
         
         # 데이터베이스 연결 확인
         if not db_manager.is_connected():

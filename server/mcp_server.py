@@ -4,6 +4,7 @@ MCP 프로토콜을 구현하여 클라이언트와 통신합니다.
 SSE(Server-Sent Events) 방식으로 HTTP 서버를 제공합니다.
 """
 
+import asyncio
 import logging
 import os
 from typing import Any, Dict, List
@@ -12,7 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from database import db_manager
 from ai_provider import ai_manager
-from http_server import make_system_prompt
+from ai_worker import natural_language_query_work,make_system_prompt, strip_markdown_sql
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,8 @@ mcp = FastMCP(
     mount_path = "/",
     message_path= "/messages/",
     streamable_http_path= "/mcp",
-    stateless_http=True
+    stateless_http=True,
+    log_level="INFO"
 )
 
 @mcp.tool(description="데이터베이스 정보를 조회한다.", title="데이터베이스 정보 조회")
@@ -120,10 +122,11 @@ async def natural_language_query(question: str) -> Dict[str, Any]:
         if question.isdigit() or len(question.strip()) < 5:
             raise ValueError("질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
 
-        result = await _natural_language_query(question)
-
+        response = await natural_language_query_work(question, False)
+        
+        result = {"data": response.data, "row_count": len(response.data), "sql": response.data.get("sql_query", ""), "status": "success"}
         logger.debug(f"자연어 쿼리 처리 결과: {result}")
-        return result
+        return  result
     except Exception as e:
         logger.error(f"자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}
@@ -166,17 +169,34 @@ async def _natural_language_query(question: str):
         
         # AI 응답 생성                                  
         response = await ai_manager.generate_response(system_prompt)
-        logger.debug(f"AI 응답 생성 결과: {response}")
+        logger.debug(f"AI 생성 결과 SQL: {response}")
         
-        # 응답 형식 검증
-        if not response.get("content"):
-            raise ValueError("AI 응답에 content가 없습니다.")   
+        sql_query = response
+        
+        # SQL 키워드가 포함되어 있는지 확인
+        sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
+        if not any(keyword in sql_query.upper() for keyword in sql_keywords):
+            logger.error(f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}")
+            return {"error": f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}", "status": "failed"}    
+
+        # 마크다운 형식 제거
+        clean_sql = strip_markdown_sql(sql_query)
+        logger.info(f"원본 SQL: {sql_query}")
+        logger.info(f"정리된 SQL: {clean_sql}")
+        
+        # SQL 쿼리 실행
+        try:
+            result = db_manager.execute_query(clean_sql)
+            return {"data": result, "row_count": len(result), "sql": clean_sql, "status": "success"}
+        except Exception as e:
+            logger.error(f"SQL 실행 오류: {e}")
+            return {"error": f"SQL 실행 오류: {e}", "status": "failed"}  
 
     except Exception as e:
         logger.error(f"자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}    
     
-def run(self):
+async def run_mcp_server():
     """MCP 서버를 실행합니다."""
     logger.info("MySQL Hub MCP 서버를 시작합니다...")
     logger.info(f"MCP 서버 호스트: {config.MCP_SERVER_HOST}")
@@ -186,4 +206,4 @@ def run(self):
 
 
 if __name__ == "__main__":
-    run()
+    asyncio.run(run_mcp_server())
