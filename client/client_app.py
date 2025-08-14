@@ -17,6 +17,10 @@ from rich.prompt import Prompt
 from rich.progress import Progress, SpinnerColumn, TextColumn
 import httpx
 
+HTTP_SERVER_URL = "http://localhost:9000"
+HTTP_TIMEOUT = 300.0
+
+
 # 로깅 설정
 def setup_logging():
     """클라이언트 로깅을 설정합니다."""
@@ -54,7 +58,7 @@ class HTTPMCPClient:
     HTTP MCP 클라이언트 클래스
     FastAPI 서버와 httpx로 통신하여 데이터베이스를 조작합니다.
     """
-    def __init__(self, server_url: str = "http://localhost:9000"):
+    def __init__(self, server_url: str = HTTP_SERVER_URL):
         self.server_url = server_url.rstrip("/")
         self.tools: List[Dict[str, Any]] = [
             {
@@ -152,7 +156,7 @@ class HTTPMCPClient:
             "MySQL Hub MCP 클라이언트 - HTTP 대화형 모드\n종료하려면 'quit' 또는 'exit'를 입력하세요.",
             title="[bold blue]환영합니다![/bold blue]"
         ))
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             while True:
                 try:
                     self.display_tools()
@@ -192,7 +196,7 @@ class HTTPMCPClient:
 
     async def batch_mode(self, tool_name: str, arguments: Dict[str, Any]):
         """배치 모드로 도구를 실행합니다."""
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             if tool_name == "execute_sql":
                 result = await self.execute_sql(client, arguments["query"])
             elif tool_name == "natural_language_query":
@@ -215,7 +219,7 @@ async def main():
     parser.add_argument("--question", help="자연어 질문 (natural_language_query 도구와 함께 사용)")
     parser.add_argument("--table", help="테이블 이름 (get_table_schema 도구와 함께 사용)")
     parser.add_argument("--list-tools", action="store_true", help="사용 가능한 도구 목록을 표시하고 종료")
-    parser.add_argument("--server-url", default="http://localhost:9000", help="서버 URL (기본값: http://localhost:9000)")
+    parser.add_argument("--server-url", default=HTTP_SERVER_URL, help=f"서버 URL (기본값: {HTTP_SERVER_URL})")
     args = parser.parse_args()
     
     logger.info(f"서버 URL: {args.server_url}")

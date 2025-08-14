@@ -196,7 +196,7 @@ async def _natural_language_query(question: str):
         logger.error(f"자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}    
     
-async def run_mcp_server():
+def run_mcp_server():
     """MCP 서버를 실행합니다."""
     logger.info("MySQL Hub MCP 서버를 시작합니다...")
     logger.info(f"MCP 서버 호스트: {config.MCP_SERVER_HOST}")
@@ -206,4 +206,4 @@ async def run_mcp_server():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_mcp_server())
+    run_mcp_server()

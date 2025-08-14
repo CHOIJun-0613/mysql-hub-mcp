@@ -55,7 +55,7 @@ class Config:
     MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "")
     
     # AI Provider 설정
-    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "groq")
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "ollama")
     
     # LLM Tool 사용 설정
     USE_LLM_TOOLS: bool = os.getenv("USE_LLM_TOOLS", "true").lower() == "true"
@@ -63,6 +63,10 @@ class Config:
     # Groq 설정
     GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+    
+    # Google Gemini 설정
+    GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
+    GOOGLE_MODEL: str = os.getenv("GOOGLE_MODEL", "gemini-1.5-flash")
     
     # Ollama 설정
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")

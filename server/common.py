@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import logging
 
@@ -15,7 +15,7 @@ class TableSchemaRequest(BaseModel):
     table_name: str
 
 class AIProviderRequest(BaseModel):
-    provider: str
+    provider: str = Field(..., description="AI Provider 이름", pattern="^(groq|ollama|google)$")
 
 class Response(BaseModel):
     success: bool
