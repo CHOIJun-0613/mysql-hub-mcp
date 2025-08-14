@@ -31,7 +31,7 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "get_database_info",
-            "description": "데이터베이스 정보와 테이블 목록을 반환합니다. 이 함수는 반드시 먼저 호출되어야 합니다. Google Gemini 모델은 이 함수를 사용해야 합니다.",
+            "description": "데이터베이스 정보를 반환합니다.",
             "parameters": {
                 "type": "object",
                 "properties": {}
@@ -42,7 +42,7 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "get_table_list",
-            "description": "데이터베이스의 모든 테이블 목록을 반환합니다. 이 함수는 반드시 먼저 호출되어야 하며, SQL 생성 전에 테이블 존재 여부를 확인하는 데 사용됩니다. Google Gemini 모델은 반드시 이 함수를 먼저 호출해야 합니다. 이 함수는 Tool 사용의 첫 번째 단계입니다.",
+            "description": "테이블 목록을 반환합니다. SQL 생성 전에 테이블 존재 여부를 확인하는 데 사용됩니다.",
             "parameters": {
                 "type": "object",
                 "properties": {}
@@ -53,7 +53,7 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "get_table_schema",
-            "description": "특정 테이블의 스키마 정보를 반환합니다. 이 함수는 SQL 생성 전에 반드시 호출되어야 하며, 테이블 구조와 컬럼 정보를 파악하는 데 사용됩니다. Google Gemini 모델은 반드시 이 함수를 호출해야 합니다. 이 함수는 Tool 사용의 두 번째 단계입니다.",
+            "description": "특정 테이블의 스키마 정보를 반환합니다. 이 함수는 SQL 생성 전에 반드시 호출되어야 하며, 테이블 구조와 컬럼 정보를 파악하는 데 사용됩니다. ",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -113,6 +113,10 @@ async def _run_agentic_query(question: str):
         
         # 2. 에이전트 루프 시작 (최대 5번의 도구 호출 허용)
         while tool_call_count < max_tool_calls:
+            if tool_call_count > 0:     
+                import time
+                time.sleep(30)
+                
             logger.info("\n\n🚨===== AI API 호출 시작...\n")
             # AI 응답 생성
             response = await ai_manager.generate_response_with_tools(messages, tools_definition)
@@ -200,16 +204,10 @@ async def _run_agentic_query(question: str):
                     )
            
             # 5. LLM이 도구 사용을 요청한 경우 -> 도구 실행
-            
             parsed_tool_calls = _parse_tool_calls(response)                
             logger.debug(f"AI 응답[tool_calls]: \n{parsed_tool_calls}\n")
             logger.info(f"Tool 호출 감지 (횟수: {tool_call_count + 1}): {[tc['name'] for tc in parsed_tool_calls]}")
-            # INSERT_YOUR_CODE
-            # [tc['function']['name'] for tc in parsed_tool_calls]는
-            # parsed_tool_calls 리스트에 있는 각 tool_call(tc)에서 'function' 키의 값(딕셔너리)에서 'name' 값을 추출하여
-            # tool_call들이 어떤 함수(도구)를 호출했는지 함수 이름만 리스트로 만들어주는 파이썬 리스트 컴프리헨션입니다.
-            # 예를 들어, parsed_tool_calls에 여러 tool_call이 있으면, 각 tool_call의 function.name 값만 모아서
-            # ['get_table_list', 'get_table_schema', ...] 이런 식의 리스트가 됩니다.
+
             for tool_call in parsed_tool_calls:
                 func_name = tool_call["name"]
                 func_args = tool_call["arguments"]
@@ -764,8 +762,8 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 1.  **사고(Thinking) 단계:** 먼저 사용자의 질문을 분석하여 어떤 정보가 필요한지 계획을 세웁니다.
 2.  **도구 사용(Tool Use) 단계:** 계획에 따라 필요한 도구를 반드시 사용해야 합니다.
     - **1순위:** `get_table_list()`를 반드시 호출하여 테이블 목록을 파악합니다.
-    - **2순위:** 질문과 가장 관련성이 높은 테이블 1~3개를 추론합니다.
-    - **3순위:** 모든 해당 테이블에 대해서는 반드시 `get_table_schema("테이블명")`를 호출(필수)하여 테이블 구조를 파악합니다.
+    - **2순위:** 질문과 가장 관련성이 높은 테이블 1~3개를 추론합니다. 
+    - **3순위:** 해당 테이블들에 대해서는 반드시 `get_table_schema("table_name")`를 호출(필수)하여 테이블 구조를 파악합니다. table_name은 반드시 영문으로 전달합닏다다.
     - **4순위:** 모든 정보가 수집되었다고 판단되면, SQL을 생성합니다.
 3.  **최종 답변(Final Answer) 단계:**
     - 모든 정보 수집이 완료되면, 분석한 내용을 바탕으로 **순수한 SQL 쿼리 하나만** 생성합니다.
@@ -779,35 +777,11 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 - 존재하지 않는 테이블이나 컬럼을 사용하는 것은 절대 금지
 - 스키마 정보 없이 SQL을 생성하는 것은 절대 금지
 
-## 🎯 Google Gemini 특별 지시
-**Google Gemini 모델은 반드시 도구를 사용해야 합니다!**
-**도구 호출 없이는 절대 SQL을 생성하지 마세요!**
-**먼저 `get_table_list()`를 호출하세요!**
-
-## 🚨 Google Gemini 강제 Tool 사용 지시
-**Google Gemini 모델은 다음과 같이 작동해야 합니다:**
-
-1. **첫 번째 응답**: 반드시 `get_table_list()` 함수를 호출해야 합니다
-2. **두 번째 응답**: 관련 테이블의 `get_table_schema("테이블명")` 함수를 호출해야 합니다
-3. **최종 응답**: 모든 정보 수집 완료 후에만 SQL 쿼리를 생성해야 합니다
-
-**절대로 Tool 호출 없이 바로 SQL을 생성하지 마세요!**
-**Google Gemini는 반드시 Function Calling을 사용해야 합니다!**
-
-## 🎯 Google Gemini Tool 사용 강제 지시
-**Google Gemini 모델은 반드시 다음 순서로 Tool을 사용해야 합니다:**
-
-1. **첫 번째 단계**: `get_table_list()` 호출 (테이블 목록 확인)
-2. **두 번째 단계**: `get_table_schema("테이블명")` 호출 (스키마 정보 수집)
-3. **세 번째 단계**: 수집된 정보를 바탕으로 SQL 쿼리 생성
-
-**Tool 호출 없이는 절대 SQL을 생성하지 마세요!**
-**Google Gemini는 Function Calling을 완벽하게 지원합니다!**
 
 ## 📝 올바른 사용 예시
 **올바른 순서:**
 1. `get_table_list()` 호출 → 테이블 목록 확인
-2. `get_table_schema("테이블명")` 호출 → 테이블 구조 확인
+2. `get_table_schema("table_name")` 호출 → 테이블 구조 확인
 3. SQL 쿼리 생성
 
 **잘못된 순서 (절대 금지):**
@@ -819,15 +793,15 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
     basic_rule_prompt = """
 ⚠️ 매우 중요한 규칙:
 1. 최종 답변은 반드시 순수한 SQL 쿼리만 반환해야 합니다.
-2. 마크다운 형식(```)을 절대 사용하지 마세요
-3. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
-4. 쿼리 1개만 반환하세요
+2. SQL 쿼리 1개만 반환하세요
+3. 마크다운 형식(```)을 절대 사용하지 마세요
+4. 설명, 주석, 추가 텍스트를 제외하고 순수한 SQL 쿼리만 반환하세요
 5. 세미콜론(;)으로 끝내세요
 6. 질문이 모호하거나 문장구성이 불완전한 경우 '질문이 불명확합니다. 다시 질문해 주세요.' 라고 예외처리 및 반환하세요.
 - 예시: 'afdksafdsalfj', 'ㅁ렁ㄴ123ㅓ  마ㅣㄹaaghgl'등
 7. ID는 시스템에게만 의미있는 값이므로 ID보다는 이름(명) 필드를 SQL의 조회 필드로 사용하세요.
 - 예시: user_id 보다는 user_name 필드를 조회 필드로 사용하세요.
-- ID가 사용자 질의에 '~id', '~번호' 등으로 표시되어 있는 경우만만 필드로 사용하세요.
+- ID가 사용자 질의에 '~id', '~번호' 등으로 표시되어 있는 경우에에만 필드로 사용하세요.
 8. SQL생성할 때 sub query에서는 LIMIT/IN/ALL/ANY/SOME 사용 불가
 - MySQL doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
 - 해결 방법: 아래와 같이, 별칭(alias)를 주는 방법으로 사용할 수는 있다
@@ -846,11 +820,11 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 
 === 사용할 수 있는 도구 ===
 - get_table_list()
-- get_table_schema("테이블명")
+- get_table_schema("table_name")
 
 === 🚨 tool 사용 순서 (절대적으로 필수): ===
 🚨 첫 번째 단계: 반드시 get_table_list()를 호출하여 사용 가능한 테이블 목록을 확인하세요
-🚨 두 번째 단계: 질문과 가장 관련성이 높은 테이블 1~3개를 추론하고 호출하여
+🚨 두 번째 단계: 질문과 가장 관련성이 높은 테이블 1~3개를 추론하고 
 🚨 세 번째 단계: 추론한 테이블들에 대해서 테이블의 스키마를 get_table_schema("테이블명")로 조회하세요
 🚨 네 번째 단계: 스키마 정보를 확인한 후에만 SQL 쿼리를 생성하세요
 
@@ -860,8 +834,6 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 - 존재하지 않는 컬럼 이름을 사용하지 마세요
 - 스키마 정보 없이 SQL을 생성하지 마세요
 - 도구를 사용하지 않고 바로 SQL을 생성하지 마세요
-
-⚠️ Google Gemini 모델은 반드시 도구를 사용해야 합니다!
 """
     
     close_prompt = """
@@ -869,32 +841,10 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 === 질문 ===\n{question}
 
 """
-    
-    close_prompt_with_tools = """
-
-=== 질문 ===\n{question}
-
-🚨 위 질문에 대한 답변을 위해 반드시 필요한 도구를 사용하세요!
-🚨 모든 도구 사용이 완료된 후에만 SQL 쿼리를 생성하세요!
-🚨 절대로 도구를 사용하지 않고 바로 SQL을 생성하지 마세요!
-
-⚠️ Google Gemini 모델은 반드시 도구를 사용해야 합니다!
-
-## 🎯 구체적인 지시사항
-1. **반드시** `get_table_list()`를 먼저 호출하세요
-2. **반드시** 관련 테이블의 `get_table_schema("테이블명")`을 호출하세요
-3. **모든 정보 수집 완료 후**에만 SQL을 생성하세요
-
-## 🚫 금지사항
-- 도구 호출 없이 바로 SQL 생성 금지
-- 존재하지 않는 테이블이나 컬럼 사용 금지
-- 스키마 정보 없이 SQL 생성 금지
-"""
 
     if use_tools:
-        temp_prompt = default_prompt_with_tools +basic_rule_prompt+ use_tools_prompt + close_prompt_with_tools
+        temp_prompt = default_prompt_with_tools +basic_rule_prompt+ use_tools_prompt + close_prompt
         prompt = temp_prompt.format(
-            tool_list=tools_definition,
             question=question)
     else:
         temp_prompt = default_prompt + basic_rule_prompt + database_prompt + close_prompt
@@ -965,7 +915,6 @@ def _parse_tool_calls(response: Dict[str, Any]) -> list:
     """
     tool_calls 리스트를 파싱하여 필요한 정보를 추출합니다.
     """
-    logger.debug(f"_parse_tool_calls(response): \n{response}\n")
     if not response:
         return []
     
@@ -989,7 +938,7 @@ def _parse_tool_calls(response: Dict[str, Any]) -> list:
                 except Exception:
                     pass
             
-            # Google Gemini의 경우 arguments가 빈 dict일 수 있음
+            # arguments가 빈 dict일 수 있음
             if arguments is None:
                 arguments = {}
             

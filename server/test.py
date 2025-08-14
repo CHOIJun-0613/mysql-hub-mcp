@@ -58,7 +58,7 @@ GenerateContentResponse(
         "candidates_token_count": 5,
         "total_token_count": 2100
       },
-      "model_version": "gemini-1.5-flash"
+              "model_version": "llama3:8b"
     }),
 )
 """
