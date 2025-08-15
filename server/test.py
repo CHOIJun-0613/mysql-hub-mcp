@@ -30,38 +30,8 @@ result2 = {
                ]
            }
 
-result3 = """
-response:
-GenerateContentResponse(
-    done=True,
-    iterator=None,
-    result=protos.GenerateContentResponse({
-      "candidates": [
-        {
-          "content": {
-            "parts": [
-              {
-                "function_call": {
-                  "name": "get_table_list",
-                  "args": {}
-                }
-              }
-            ],
-            "role": "model"
-          },
-          "finish_reason": "STOP",
-          "avg_logprobs": -1.2874037201981991e-05
-        }
-      ],
-      "usage_metadata": {
-        "prompt_token_count": 2095,
-        "candidates_token_count": 5,
-        "total_token_count": 2100
-      },
-              "model_version": "llama3:8b"
-    }),
-)
-"""
+result3 = {'role': 'assistant', 'content': '```json\n{\n  "name": "get_table_list",\n  "arguments": {}\n}\n```'}
+result4 = {'role': 'assistant', 'content': '{"name": "get_table_schema", "arguments": {"table_name": "users"}}'}
 
 # 'table_name' 값 추출 및 출력
 tool_call = result['tool_calls'][0]
@@ -77,7 +47,7 @@ parsed_tool_calls = []
 
 
 
-result = result2
+result = result4
 
 if 'tool_calls' in result:
     print("'tool_calls'가 result에 포함되어 있습니다.")
@@ -100,9 +70,45 @@ if 'tool_calls' in result:
             'arguments': arguments
         })
 else:
-    print("'tool_calls'가 result에 포함되어 있지 않습니다.")
-
-
+  print("'tool_calls'가 result에 포함되어 있지 않습니다.")
+  if 'tool_calls' not in result and 'content' in result:
+      content = result['content']
+      
+      if content.strip().startswith("```json\n{\n"):
+          # '```json'과 '```' 사이의 JSON 부분 추출
+          import re
+          
+          match = re.search(r'```json\s*([\s\S]+?)\s*```', content)
+          if match:
+              json_str = match.group(1)
+              try:
+                  function_info = json.loads(json_str)
+                  name = function_info.get('name')
+                  arguments = function_info.get('arguments')
+                  tool_call_id = None
+                  index = 1
+                  parsed_tool_calls.append({
+                      'name': name,
+                      'tool_call_id': tool_call_id,
+                      'index': index,
+                      'arguments': arguments
+                  })
+              except Exception as e:
+                  print(f"content에서 JSON 파싱 실패: {e}")
+      elif content.strip().startswith('{"name"'):
+          function_info = json.loads(content)
+          name = function_info.get('name')
+          arguments = function_info.get('arguments')
+          tool_call_id = None
+          index = 1
+          parsed_tool_calls.append({
+              'name': name,
+              'tool_call_id': tool_call_id,
+              'index': index,
+              'arguments': arguments
+          })
+  else:
+      print("'tool_calls'가 result에 포함되어 있지 않고 'content'도 없습니다.") 
 
 print(parsed_tool_calls)
 

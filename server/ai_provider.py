@@ -24,8 +24,8 @@ class AIProvider(ABC):
         pass
     
     @abstractmethod
-    async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다."""
+    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
         pass
     
     @abstractmethod
@@ -70,8 +70,9 @@ class GroqProvider(AIProvider):
                     ],
                     "tools": tools,
                     "tool_choice": "auto",
-                    "max_tokens": 1000,
-                    "temperature": 0.1
+                    "max_tokens": 4096,
+                    "temperature": 0.1,
+                    "reasoning_format": "hidden"
                 }
             else:
                 # 기존 방식 - http_server.py에서 전달받은 프롬프트 그대로 사용
@@ -80,8 +81,9 @@ class GroqProvider(AIProvider):
                     "messages": [
                         {"role": "user", "content": prompt}
                     ],
-                    "max_tokens": 1000,
-                    "temperature": 0.1
+                    "max_tokens": 4096,
+                    "temperature": 0.1,
+                    "reasoning_format": "hidden"
                 }
             
             # httpx를 사용하여 timeout 설정
@@ -116,12 +118,24 @@ class GroqProvider(AIProvider):
             logger.error(f"Groq 응답 생성 실패: {e}")
             return f"응답 생성 중 오류가 발생했습니다: {e}"
     
-    async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다."""
+    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
         if not self.client:
             return {"error": "Groq 클라이언트가 초기화되지 않았습니다."}
         
         try:
+            # 시스템 프롬프트 + 사용자 질문만 포함
+            messages = initial_messages.copy()
+            
+            # Tool 결과가 있으면 별도로 추가
+            if tool_results:
+                for result in tool_results:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": result.get("tool_call_id"),
+                        "name": result.get("name"),
+                        "content": result.get("content")
+                    })
             
             # httpx를 사용하여 timeout 설정
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -136,8 +150,9 @@ class GroqProvider(AIProvider):
                         "messages": messages,
                         "tools": tools,
                         "tool_choice": "auto",
-                        "max_tokens": 1000,
-                        "temperature": 0.1
+                        "max_tokens": 4096,
+                        "temperature": 0.1,
+                        "reasoning_format": "hidden"
                     }
                 )
                 
@@ -187,7 +202,7 @@ class OllamaProvider(AIProvider):
                     "stream": False,
                     "options": {
                         "temperature": 0.1,
-                        "num_predict": 1024
+                        "num_predict": 4096
                     }
                 }
                 
@@ -200,7 +215,7 @@ class OllamaProvider(AIProvider):
                     "stream": False,
                     "options": {
                         "temperature": 0.1,
-                        "num_predict": 1024
+                        "num_predict": 4096
                     }
                 }
                 
@@ -274,9 +289,21 @@ class OllamaProvider(AIProvider):
             logger.error(error_msg)
             return error_msg
     
-    async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다."""
+    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
         try:
+            # 시스템 프롬프트 + 사용자 질문만 포함
+            messages = initial_messages.copy()
+            
+            # Tool 결과가 있으면 별도로 추가
+            if tool_results:
+                for result in tool_results:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": result.get("tool_call_id"),
+                        "name": result.get("name"),
+                        "content": result.get("content")
+                    })
             
             # Ollama의 네이티브 Tool 지원 사용
             payload = {
@@ -286,7 +313,7 @@ class OllamaProvider(AIProvider):
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
-                    "num_predict": 1024
+                    "num_predict": 4096
                 }
             }
             
@@ -371,9 +398,6 @@ class OllamaProvider(AIProvider):
             logger.error(f"Ollama 연결 테스트 실패: {e}")
             return False
 
-
-
-
 class AIProviderManager:
     """AI Provider 관리자"""
     
@@ -412,13 +436,13 @@ class AIProviderManager:
             # 기존 방식 - tools 파라미터 없이 호출
             return await provider.generate_response(prompt)
     
-    async def generate_response_with_tools(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """현재 Provider를 사용하여 Tool과 함께 응답을 생성합니다."""
+    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """현재 Provider를 사용하여 Tool과 함께 응답을 생성합니다. (개선된 방식)"""
         provider = self.providers.get(self.current_provider)
         if not provider:
             return {"error": "사용 가능한 AI Provider가 없습니다."}
         
-        return await provider.generate_response_with_tools(messages, tools)
+        return await provider.generate_response_with_tools(initial_messages, tools, tool_results)
     
     def get_current_provider(self) -> str:
         """현재 사용 중인 Provider 이름을 반환합니다."""
