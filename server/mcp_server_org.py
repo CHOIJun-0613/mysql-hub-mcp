@@ -264,7 +264,7 @@ class MySQLMCPServer:
         max_iterations = 5
         for iteration in range(max_iterations):
             # AI 응답 생성
-            response = await ai_manager.generate_response_with_tools(messages, tools)
+            response = await ai_manager.generate_response(messages, tools)
             
             if "error" in response:
                 return CallToolResult(

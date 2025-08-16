@@ -19,13 +19,8 @@ class AIProvider(ABC):
     """AI Provider 추상 클래스"""
     
     @abstractmethod
-    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
-        """프롬프트에 대한 응답을 생성합니다."""
-        pass
-    
-    @abstractmethod
-    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
+    async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """메시지와 도구를 사용하여 응답을 생성합니다."""
         pass
     
     @abstractmethod
@@ -53,38 +48,25 @@ class GroqProvider(AIProvider):
         except Exception as e:
             logger.error(f"Groq 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Groq를 사용하여 응답을 생성합니다."""
         if not self.client:
-            return "Groq 클라이언트가 초기화되지 않았습니다."
+            return {"error": "Groq 클라이언트가 초기화되지 않았습니다."}
         
         try:
+            # 기본 요청 데이터
+            request_data = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": 8192,
+                "temperature": 0.1,
+                "reasoning_format": "hidden"
+            }
             
-            # 환경변수에 따라 Tool 사용 여부 결정
-            if config.USE_LLM_TOOLS and tools:
-                # Tool 사용 방식
-                request_data = {
-                    "model": self.model,
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "tools": tools,
-                    "tool_choice": "auto",
-                    "max_tokens": 4096,
-                    "temperature": 0.1,
-                    "reasoning_format": "hidden"
-                }
-            else:
-                # 기존 방식 - http_server.py에서 전달받은 프롬프트 그대로 사용
-                request_data = {
-                    "model": self.model,
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 4096,
-                    "temperature": 0.1,
-                    "reasoning_format": "hidden"
-                }
+            # Tool이 있으면 추가
+            if tools:
+                request_data["tools"] = tools
+                request_data["tool_choice"] = "auto"
             
             # httpx를 사용하여 timeout 설정
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -99,70 +81,11 @@ class GroqProvider(AIProvider):
                 
                 if response.status_code == 200:
                     result = response.json()
-                    message = result["choices"][0]["message"]
-                    
-                    # Tool 사용 방식인 경우 tool_calls가 있을 수 있음
-                    if config.USE_LLM_TOOLS and tools and "tool_calls" in message:
-                        # Tool 호출이 있는 경우 처리
-                        tool_calls = message.get("tool_calls", [])
-                        if tool_calls:
-                            # 첫 번째 tool call의 함수 이름 반환 (디버깅용)
-                            first_tool = tool_calls[0]
-                            func_name = first_tool.get("function", {}).get("name", "unknown")
-                            return f"Tool 호출 감지: {func_name} (tools 지원 필요)"
-                    
-                    return message.get("content", "응답이 없습니다.")
-                else:
-                    return f"Groq API 오류: {response.status_code} - {response.text}"
-        except Exception as e:
-            logger.error(f"Groq 응답 생성 실패: {e}")
-            return f"응답 생성 중 오류가 발생했습니다: {e}"
-    
-    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
-        if not self.client:
-            return {"error": "Groq 클라이언트가 초기화되지 않았습니다."}
-        
-        try:
-            # 시스템 프롬프트 + 사용자 질문만 포함
-            messages = initial_messages.copy()
-            
-            # Tool 결과가 있으면 별도로 추가
-            if tool_results:
-                for result in tool_results:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": result.get("tool_call_id"),
-                        "name": result.get("name"),
-                        "content": result.get("content")
-                    })
-            
-            # httpx를 사용하여 timeout 설정
-            async with httpx.AsyncClient(timeout=180.0) as client:
-                response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {config.GROQ_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "tools": tools,
-                        "tool_choice": "auto",
-                        "max_tokens": 4096,
-                        "temperature": 0.1,
-                        "reasoning_format": "hidden"
-                    }
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
                     return result["choices"][0]["message"]
                 else:
                     return {"error": f"Groq API 오류: {response.status_code} - {response.text}"}
         except Exception as e:
-            logger.error(f"Groq Tool 응답 생성 실패: {e}")
+            logger.error(f"Groq 응답 생성 실패: {e}")
             return {"error": f"응답 생성 중 오류가 발생했습니다: {e}"}
     
     def is_available(self) -> bool:
@@ -184,132 +107,13 @@ class OllamaProvider(AIProvider):
         except Exception as e:
             logger.error(f"Ollama 클라이언트 초기화 실패: {e}")
     
-    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Ollama를 사용하여 응답을 생성합니다."""
         try:
-            
-            # 환경변수에 따라 Tool 사용 여부 결정
-            if config.USE_LLM_TOOLS and tools:
-                # Tool 사용 방식 - Ollama의 네이티브 Tool 지원 사용
-                messages = [
-                    {"role": "user", "content": prompt}
-                ]
-                
-                payload = {
-                    "model": self.model,
-                    "messages": messages,
-                    "tools": tools,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "num_predict": 4096
-                    }
-                }
-                
-                endpoint = "/api/chat"  # Tool 사용시 /api/chat 엔드포인트 사용
-            else:
-                # 기존 방식 - http_server.py에서 전달받은 프롬프트 그대로 사용
-                payload = {
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "num_predict": 4096
-                    }
-                }
-                
-                endpoint = "/api/generate"  # 기존 방식은 /api/generate 엔드포인트 사용
-            
-            logger.debug(f"Ollama API 호출 시작: {self.url}{endpoint}")
-            logger.debug(f"모델: {self.model}")
-            if not config.USE_LLM_TOOLS or not tools:
-                logger.debug(f"프롬프트 길이: {len(payload.get('prompt', ''))}")
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.url}{endpoint}",
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=180.0  # 타임아웃을 180초로 설정
-                )
-                
-                logger.debug(f"Ollama API 응답 상태: {response.status_code}")
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    
-                    if config.USE_LLM_TOOLS and tools:
-                        # Tool 사용 방식
-                        message = result.get("message", {})
-                        response_text = message.get("content", "응답이 없습니다.")
-                        
-                        # Tool 호출이 있는 경우 처리
-                        if "tool_calls" in message:
-                            tool_calls = message.get("tool_calls", [])
-                            if tool_calls:
-                                first_tool = tool_calls[0]
-                                func_name = first_tool.get("function", {}).get("name", "unknown")
-                                return f"Tool 호출 감지: {func_name} (tools 지원 필요)"
-                    else:
-                        # 기존 방식
-                        response_text = result.get("response", "응답이 없습니다.")
-                    
-                    # UTF-8 인코딩 문제 해결
-                    try:
-                        # 응답 텍스트를 UTF-8로 정리
-                        if isinstance(response_text, bytes):
-                            response_text = response_text.decode('utf-8', errors='ignore')
-                        elif isinstance(response_text, str):
-                            # 특수 문자나 인코딩 문제가 있는 문자 제거
-                            response_text = response_text.encode('utf-8', errors='ignore').decode('utf-8')
-                        
-                        # 제어 문자 제거
-                        import re
-                        response_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', response_text)
-                        return response_text
-                    except Exception as e:
-                        logger.error(f"응답 텍스트 정리 중 오류: {e}")
-                        return "SQL 쿼리 생성 중 오류가 발생했습니다."
-                else:
-                    error_msg = f"Ollama API 오류: {response.status_code} - {response.text}"
-                    logger.error(error_msg)
-                    return error_msg
-                    
-        except httpx.TimeoutException:
-            error_msg = "Ollama API 호출 시간 초과"
-            logger.error(error_msg)
-            return error_msg
-        except httpx.ConnectError:
-            error_msg = "Ollama 서버에 연결할 수 없습니다"
-            logger.error(error_msg)
-            return error_msg
-        except Exception as e:
-            error_msg = f"Ollama 응답 생성 실패: {e}"
-            logger.error(error_msg)
-            return error_msg
-    
-    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Tool을 사용하여 응답을 생성합니다. (개선된 방식)"""
-        try:
-            # 시스템 프롬프트 + 사용자 질문만 포함
-            messages = initial_messages.copy()
-            
-            # Tool 결과가 있으면 별도로 추가
-            if tool_results:
-                for result in tool_results:
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": result.get("tool_call_id"),
-                        "name": result.get("name"),
-                        "content": result.get("content")
-                    })
-            
-            # Ollama의 네이티브 Tool 지원 사용
+            # 기본 요청 데이터
             payload = {
                 "model": self.model,
                 "messages": messages,
-                "tools": tools,
                 "stream": False,
                 "options": {
                     "temperature": 0.1,
@@ -317,38 +121,94 @@ class OllamaProvider(AIProvider):
                 }
             }
             
+            # Tool이 있으면 /api/chat, 없으면 /api/generate 사용
+            if tools:
+                payload["tools"] = tools
+                endpoint = "/api/chat"
+            else:
+                # 기존 방식과의 호환성을 위해 system과 user 메시지를 하나의 prompt로 결합
+                if messages and len(messages) > 0:
+                    prompt_parts = []
+                    for message in messages:
+                        if message.get("role") == "system":
+                            prompt_parts.append(f"시스템 지시사항:\n{message.get('content', '')}")
+                        elif message.get("role") == "user":
+                            prompt_parts.append(f"사용자 질문:\n{message.get('content', '')}")
+                    
+                    if prompt_parts:
+                        payload["prompt"] = "\n\n".join(prompt_parts)
+                        del payload["messages"]
+                endpoint = "/api/generate"
+            
+            logger.debug(f"Ollama API 호출 시작: {self.url}{endpoint}")
+            logger.debug(f"모델: {self.model}")
+            
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.url}/api/chat",  # /api/generate 대신 /api/chat 사용
+                    f"{self.url}{endpoint}",
                     json=payload,
                     headers={"Content-Type": "application/json"},
-                    timeout=180.0
+                    timeout=300.0
                 )
+                
+                logger.debug(f"Ollama API 응답 상태: {response.status_code}")
                 
                 if response.status_code == 200:
                     result = response.json()
-                    message = result.get("message", {})
                     
-                    # UTF-8 인코딩 문제 해결
-                    if "content" in message and isinstance(message["content"], str):
-                        content = message["content"]
-                        if isinstance(content, bytes):
-                            content = content.decode('utf-8', errors='ignore')
-                        elif isinstance(content, str):
-                            content = content.encode('utf-8', errors='ignore').decode('utf-8')
+                    if tools:
+                        # Tool 사용 방식
+                        message = result.get("message", {})
                         
-                        # 제어 문자 제거
-                        import re
-                        content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
-                        message["content"] = content
-                    
-                    return message
+                        # UTF-8 인코딩 문제 해결
+                        if "content" in message and isinstance(message["content"], str):
+                            content = message["content"]
+                            if isinstance(content, bytes):
+                                content = content.decode('utf-8', errors='ignore')
+                            elif isinstance(content, str):
+                                content = content.encode('utf-8', errors='ignore').decode('utf-8')
+                            
+                            # 제어 문자 제거
+                            import re
+                            content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
+                            message["content"] = content
+                        
+                        return message
+                    else:
+                        # 기존 방식
+                        response_text = result.get("response", "응답이 없습니다.")
+                        
+                        # UTF-8 인코딩 문제 해결
+                        try:
+                            if isinstance(response_text, bytes):
+                                response_text = response_text.decode('utf-8', errors='ignore')
+                            elif isinstance(response_text, str):
+                                response_text = response_text.encode('utf-8', errors='ignore').decode('utf-8')
+                            
+                            # 제어 문자 제거
+                            import re
+                            response_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', response_text)
+                            return {"content": response_text}
+                        except Exception as e:
+                            logger.error(f"응답 텍스트 정리 중 오류: {e}")
+                            return {"error": "SQL 쿼리 생성 중 오류가 발생했습니다."}
                 else:
-                    return {"error": f"Ollama API 오류: {response.status_code} - {response.text}"}
+                    error_msg = f"Ollama API 오류: {response.status_code} - {response.text}"
+                    logger.error(error_msg)
+                    return {"error": error_msg}
                     
+        except httpx.TimeoutException:
+            error_msg = "Ollama API 호출 시간 초과"
+            logger.error(error_msg)
+            return {"error": error_msg}
+        except httpx.ConnectError:
+            error_msg = "Ollama 서버에 연결할 수 없습니다"
+            logger.error(error_msg)
+            return {"error": error_msg}
         except Exception as e:
-            logger.error(f"Ollama Tool 응답 생성 실패: {e}")
-            return {"error": f"응답 생성 중 오류가 발생했습니다: {e}"}
+            error_msg = f"Ollama 응답 생성 실패: {e}"
+            logger.error(error_msg)
+            return {"error": error_msg}
     
     def is_available(self) -> bool:
         """Ollama가 사용 가능한지 확인합니다."""
@@ -422,27 +282,13 @@ class AIProviderManager:
         
         logger.error("사용 가능한 AI Provider가 없습니다.")
     
-    async def generate_response(self, prompt: str, tools: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """현재 Provider를 사용하여 응답을 생성합니다."""
-        provider = self.providers.get(self.current_provider)
-        if not provider:
-            return "사용 가능한 AI Provider가 없습니다."
-        
-        # 환경변수에 따라 Tool 사용 여부 결정
-        if config.USE_LLM_TOOLS and tools:
-            # Tool 사용 방식
-            return await provider.generate_response(prompt, tools)
-        else:
-            # 기존 방식 - tools 파라미터 없이 호출
-            return await provider.generate_response(prompt)
-    
-    async def generate_response_with_tools(self, initial_messages: List[Dict[str, Any]], tools: List[Dict[str, Any]], tool_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """현재 Provider를 사용하여 Tool과 함께 응답을 생성합니다. (개선된 방식)"""
         provider = self.providers.get(self.current_provider)
         if not provider:
             return {"error": "사용 가능한 AI Provider가 없습니다."}
         
-        return await provider.generate_response_with_tools(initial_messages, tools, tool_results)
+        return await provider.generate_response(messages, tools)
     
     def get_current_provider(self) -> str:
         """현재 사용 중인 Provider 이름을 반환합니다."""

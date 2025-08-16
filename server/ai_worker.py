@@ -13,8 +13,8 @@ from ai_provider import ai_manager
 from common import Response
 
 
-async def get_table_list():
-    return db_manager.get_table_list()
+async def get_table_list(database_name: str = None):
+    return db_manager.get_table_list(database_name)
 
 async def get_table_schema(table_name: str):
     return db_manager.get_table_schema(table_name)
@@ -45,7 +45,12 @@ tools_definition = [
             "description": "테이블 목록을 반환합니다. SQL 생성 전에 테이블 존재 여부를 확인하는 데 사용됩니다.",
             "parameters": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "database_name": {
+                        "type": "string",
+                        "description": "테이블 목록을 조회할 데이터베이스 이름 (선택사항, 기본값은 현재 연결된 데이터베이스)"
+                    }
+                }
             }
         }
     },
@@ -76,7 +81,7 @@ async def natural_language_query_work(question: str, use_tools: bool):
         # Tool 사용 여부에 따라 분기 처리
         if use_tools:
             # Tool 사용 방식
-            return await _run_agentic_query(question)
+            return await _natural_language_query_with_tools(question)
         else:
             # 기존 방식 - system prompt에 스키마 정보 포함
             return await _natural_language_query_legacy(question)
@@ -87,20 +92,84 @@ async def natural_language_query_work(question: str, use_tools: bool):
             success=False,
             error=f"자연어 쿼리 처리 중 오류가 발생했습니다: {e}"
         )
+async def _make_clear_sql(response: Dict[str, Any]) :
+    # AI 응답이 실제 SQL 쿼리인지 더 엄격하게 확인
+    if not response:
+        logger.error(f"\n>>> make_clear_sql() response is None")
+        return Response(
+            success=False,
+            error=" make_clear_sql() response is None"
+        )
+    logger.debug(f"\n>>> _make_clear_sql(response): \n{response}\n")
+    content = ""
+
+    # sql_return이 딕셔너리인지 확인
+    if isinstance(response, dict) and "content" in response:
+        content = response["content"]
+    else:
+        content = str(response)
+    
+    import re
+    if "<think>" in content:
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+    
+    # 에러 메시지나 설명 텍스트인지 확인
+    error_indicators = [
+        "질문이 불명확합니다",
+        "응답 생성 중 오류",
+        "죄송합니다",
+        "이해할 수 없습니다",
+        "모호합니다",
+        "다시 질문해 주세요"
+    ]
+    
+    if any(indicator in content for indicator in error_indicators):
+        return Response(
+            success=False,
+            error=f"질문이 불명확합니다: {content}"
+        )
+    
+    # SQL 키워드가 포함되어 있는지 확인
+    sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
+    if not any(keyword in content.upper() for keyword in sql_keywords):
+        return Response(
+            success=False,
+            error=f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {content}"
+        )
+
+    
+    sql_query = strip_markdown_sql(content)
+    
+    if not sql_query or sql_query.startswith("응답 생성 중 오류"):
+        return Response(
+            success=False,
+            error=f"SQL 생성 실패: {sql_query}"
+        )
         
-async def _run_agentic_query(question: str):
+    clean_sql = pretty_format_sql(sql_query)
+    
+    logger.debug(f"pretty_format_sql: \n{clean_sql}\n")
+    
+    logger.debug(f"\n>>> _make_clear_sql(clean_sql): \n{clean_sql}\n")
+    return Response(
+        success=True,
+        data={
+            "sql_query": clean_sql
+        }
+    )
+          
+async def _natural_language_query_with_tools(question: str):
     """Tool을 사용하여 자연어를 SQL로 변환합니다."""
     try:
         
         # Tool 사용 모드를 위한 system prompt 구성
         system_prompt = make_system_prompt('', '', question, True)
         
-        # 1. 시스템 프롬프트는 한 번만 전달
-        system_message = {"role": "system", "content": system_prompt}
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
+        ]
         
-        # 2. 사용자 질문도 한 번만 전달
-        user_message = {"role": "user", "content": question}
-
         logger.debug(f"시스템 프롬프트: \n{system_prompt}\n")
         logger.debug(f"사용자 질문: {question}")
         logger.info(f"Tool 방식으로 처리 시작")
@@ -119,32 +188,28 @@ async def _run_agentic_query(question: str):
                 time.sleep(30)
                 
             logger.info("\n\n🚨===== AI API 호출 시작...\n")
-            
-            # 4. 핵심 개선: 시스템 프롬프트는 한 번만, Tool 결과만 누적
-            current_messages = [
-                system_message,  # 시스템 프롬프트 (한 번만)
-                user_message,    # 사용자 질문 (한 번만)
-            ]
-            
             # Tool 결과가 있으면 추가
             if tool_results:
                 for result in tool_results:
-                    current_messages.append({
+                    messages.append({
                         "role": "tool",
                         "tool_call_id": result.get("tool_call_id"),
                         "name": result.get("name"),
                         "content": result.get("content")
                     })
+            logger.debug(f"\n>>> messages: \n{messages}\n")
             
-            # AI 응답 생성 (시스템 프롬프트는 한 번만, Tool 결과만 누적)
-            response = await ai_manager.generate_response_with_tools(
-                current_messages,  # 현재 상태의 메시지들
-                tools_definition,
-                None  # tool_results 파라미터는 사용하지 않음
+            import time
+            start_time = time.time()
+            # AI 응답 생성 
+            response = await ai_manager.generate_response(
+                messages,  
+                tools_definition
             )
-            
-            logger.info(f"\n🚨===== AI 응답(response): \n{response}\n")
-            
+            elapsed_time = time.time() - start_time
+                        
+            logger.info(f"\n🚨===== AI 응답(시간:{elapsed_time:.2f}초), \n>>> response:\n{response}\n")
+                        
             # response에 'content'가 있고 '<think>...</think>'이 포함되어 있으면 제거 후 다시 할당
             if "content" in response and isinstance(response["content"], str):
                 import re
@@ -166,114 +231,24 @@ async def _run_agentic_query(question: str):
                     error="AI 응답 형식이 올바르지 않습니다."
                 )
 
-            # 4. LLM이 도구 사용 대신 최종 답변을 한 경우 -> 루프 종료
+            
             if "tool_calls" not in response or not response["tool_calls"]: 
-                content = response.get("content", "")
-                # content가 '```json\n{\n' 또는 '{"name"'으로 시작하면 tool_calls와 동일하게 처리 (루프 계속)
-                if content.strip().startswith("```json\n{\n") or content.strip().startswith('{"name"'):
-                    logger.debug("content가 tool_calls와 동일한 JSON 함수 호출 형식입니다. 루프를 계속 진행합니다.")
-                else:
-                    sql_query = content
-                    logger.info(f"\n✅ AI 응답 최종 결과(content): \n{sql_query}\n")
-                    # AI 응답이 실제 SQL 쿼리인지 더 엄격하게 확인
-                    if not sql_query:
-                        return Response(
-                            success=False,
-                            error="AI 응답이 비어있습니다."
-                        )
-                    
-                    # 에러 메시지나 설명 텍스트인지 확인
-                    error_indicators = [
-                        "질문이 불명확합니다",
-                        "응답 생성 중 오류",
-                        "죄송합니다",
-                        "이해할 수 없습니다",
-                        "모호합니다",
-                        "다시 질문해 주세요"
-                    ]
-                    
-                    if any(indicator in sql_query for indicator in error_indicators):
-                        return Response(
-                            success=False,
-                            error=f"질문이 불명확합니다: {sql_query}"
-                        )
-                    
-                    # SQL 키워드가 포함되어 있는지 확인
-                    sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
-                    if not any(keyword in sql_query.upper() for keyword in sql_keywords):
-                        return Response(
-                            success=False,
-                            error=f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}"
-                        )
-
-                    # 마크다운 형식 제거
-                    clean_sql = strip_markdown_sql(sql_query)
-                    logger.info(f"원본 SQL: {sql_query}")
-                    logger.info(f"정리된 SQL: {clean_sql}")
-                    
-                    # SQL 쿼리 실행
-                    try:
-                        result = db_manager.execute_query(clean_sql)
-                        sql_query_result = Response(
-                            success=True,
-                            data={
-                                "sql_query": clean_sql,
-                                "result": result
-                            }
-                        )
-                        logger.info(f"\n\n=====✅ 쿼리 실행 결과: \n{sql_query_result.data}\n")
-                        return sql_query_result
-                    except Exception as e:
-                        return Response(
-                            success=False,
-                            error=f"SQL 실행 오류: {e}"
-                        )
-           
-            # 5. LLM이 도구 사용을 요청한 경우 -> 도구 실행
-            parsed_tool_calls = _parse_tool_calls(response)                
-            logger.debug(f"AI 응답[tool_calls]: \n{parsed_tool_calls}\n")
-            logger.info(f"Tool 호출 감지 (횟수: {tool_call_count + 1}): {[tc['name'] for tc in parsed_tool_calls]}")
-
-            for tool_call in parsed_tool_calls:
-                func_name = tool_call["name"]
-                func_args = tool_call["arguments"]
-                tool_call_id = tool_call["tool_call_id"]
-                logger.debug(f"Tool 호출 감지 (횟수: {tool_call_count + 1}): {func_name}")
-                logger.debug(f"Tool 호출 인자: {func_args}")
+                logger.debug(f"\n>>> 최종 답변 감지: \n")
+                # 4. LLM이 도구 사용 대신 최종 답변을 한 경우 -> 루프 종료
+                return await _finalize_sql_response(response)
+            else:
+                logger.debug(f"\n>>> 도구 호출 감지: \n{(tool_call_count+1)} 회차\n")
+                result = await _exec_tool_response(response)
+                if "error" in result:
+                    return Response(
+                        success=False,
+                        error=f"Tool 실행 오류: {result['error']}"
+                    )
+                # result가 리스트이므로, 각 결과를 tool_results에 append
+                for r in result:
+                    tool_results.append(r)
                 
-                if func_name in available_tools:
-                    functoin_to_call = available_tools[func_name]
-                    logger.debug(f"🧠 LLM 요청: 로컬 함수 {func_name}, ({json.dumps(func_args, ensure_ascii=False)}) 실행")
-                    try:
-                        tool_result = await functoin_to_call(**func_args)
-                        logger.debug(f"🧠 로컬 함수 실행 결과: {tool_result}")
-                        
-                        # Tool 실행 결과를 tool_results에 추가 (메시지 히스토리에 추가하지 않음)
-                        tool_results.append({
-                            "tool_call_id": tool_call_id,
-                            "name": func_name,
-                            "content": json.dumps(tool_result, ensure_ascii=False),
-                        })
-                        
-                        # Tool 호출 횟수 증가
-                        tool_call_count += 1
-                        
-                    except Exception as e:
-                        logger.error(f"🧠 로컬 함수 실행 오류: {e}")
-                        tool_result = f"Tool 실행 중 오류가 발생했습니다: {e}"
-                        tool_results.append({
-                            'tool_call_id': tool_call_id,
-                            'name': func_name,
-                            'content': json.dumps({"error": str(e)}, ensure_ascii=False)
-                        })
-                        
-                        # Tool 호출 횟수 증가
-                        tool_call_count += 1
-                else:
-                    logger.error(f"🧠 알 수 없는 도구 호출: {func_name}")
-                    # 알 수 없는 도구 호출도 횟수에 포함
-                    tool_call_count += 1
-        
+                tool_call_count += 1
         # 최대 Tool 호출 횟수 초과
         return Response(
             success=False,
@@ -287,65 +262,184 @@ async def _run_agentic_query(question: str):
             error=f"Tool 방식 처리 중 오류가 발생했습니다: {e}"
         )
 
+async def _finalize_sql_response(response: Dict[str, Any]) :
+    if not response:
+        logger.error(f"\n>>> _finalize_sql_response() response is None")
+        return Response(
+            success=False,
+            error=" _finalize_sql_response() response is None"
+        )
+    logger.debug(f"\n>>> _finalize_sql_response(response): \n{response}\n")
+    content = response.get("content", "")
+    # content가 '```json\n{\n' 또는 '{"name"'으로 시작하면 tool_calls와 동일하게 처리 (루프 계속)
+    if content.strip().startswith("```json\n{\n") or content.strip().startswith('{"name"'):
+        logger.debug("content가 tool_calls와 동일한 JSON 함수 호출 형식입니다. 루프를 계속 진행합니다.")
+    else:
+        # AI 응답 정리 -> SQL 쿼리 추출
+        result_sql = await _make_clear_sql(response)
+        logger.debug(f"\n>>> result_sql: \n{result_sql}\n")
+        # result_sql이 Response 객체인지 확인
+        if hasattr(result_sql, 'success') and not result_sql.success:
+            return result_sql  # 에러가 있으면 그대로 반환
+        
+        # 성공한 경우 data에서 sql_query 추출
+        clean_sql = result_sql.data.get("sql_query", "")
+        logger.info(f"\n✅ AI 응답 최종 결과(content): \n{clean_sql}\n")
+        # SQL 쿼리 실행
+        try:
+            result = db_manager.execute_query(clean_sql)
+            sql_query_result = Response(
+                success=True,
+                data={
+                    "sql_query": clean_sql,
+                    "result": result
+                }
+            )
+            logger.info(f"\n\n=====✅ 쿼리 실행 결과: \n{sql_query_result.data}\n")
+            return sql_query_result
+        except Exception as e:
+            return Response(
+                success=False,
+                error=f"SQL 실행 오류: {e}"
+            )
+           
+async def _exec_tool_response(response: Dict[str, Any]) -> Dict[str, Any]:
+    tool_results = []
+    if not response:
+        logger.error(f"\n>>> _exec_tool_response() response is None")
+        return Response(
+            success=False,
+            error=" _exec_tool_response() response is None"
+        )
+    logger.debug(f"\n>>> _exec_tool_response(response): \n{response}\n")
+    
+    #LLM이 도구 사용을 요청한 경우 -> 도구 실행
+    parsed_tool_calls = _parse_tool_calls(response)                
+    logger.debug(f"AI 응답[tool_calls]: \n{parsed_tool_calls}\n")
+
+    for tool_call in parsed_tool_calls:
+        func_name = tool_call["name"]
+        func_args = tool_call["arguments"]
+        tool_call_id = tool_call["tool_call_id"]
+        logger.debug(f"Tool 호출 감지: {func_name}({json.dumps(func_args, ensure_ascii=False)})")
+        
+        if func_name in available_tools:
+            functoin_to_call = available_tools[func_name]
+            logger.debug(f"🧠 LLM 요청: 로컬 함수 {func_name}, ({json.dumps(func_args, ensure_ascii=False)}) 실행")
+            try:
+                tool_result = await functoin_to_call(**func_args)
+                logger.debug(f"🧠 로컬 함수 실행 결과: {tool_result}")
+                
+                # Tool 실행 결과를 tool_results에 추가 (메시지 히스토리에 추가하지 않음)
+                tool_results.append({
+                    "tool_call_id": tool_call_id,
+                    "name": func_name,
+                    "content": json.dumps(tool_result, ensure_ascii=False),
+                })
+            except Exception as e:
+                logger.error(f"🧠 로컬 함수 실행 오류: {e}")
+                tool_result = f"Tool 실행 중 오류가 발생했습니다: {e}"
+                tool_results.append({
+                    'tool_call_id': tool_call_id,
+                    'name': func_name,
+                    'content': json.dumps({"error": str(e)}, ensure_ascii=False)
+                })
+        else:
+            logger.error(f"🧠 알 수 없는 도구 호출: {func_name}")
+    return tool_results
+
+async def get_table_list_and_schema()-> Dict[str, Any]:
+    response = db_manager.get_database_info()
+    if "error" in response:
+        return Response(
+            success=False,
+            error=f"데이터베이스 연결 오류: {response['error']}"
+        )
+    database_name = response.get("database_name", "unknown")
+
+    schema_info = ""
+    table_list = db_manager.get_table_list(database_name)
+    # table_list에서 시스템 테이블(INFORMATION_SCHEMA, mysql, performance_schema, sys)로 시작하는 테이블 제외
+    if isinstance(table_list, list):
+        user_tables = [table for table in table_list 
+                        if not table.get("TABLE_NAME", "").startswith("INFORMATION_SCHEMA")
+                        and not table.get("TABLE_NAME", "").startswith("mysql")
+                        and not table.get("TABLE_NAME", "").startswith("performance_schema")
+                        and not table.get("TABLE_NAME", "").startswith("sys")]
+    else:
+        user_tables = []
+
+    # 테이블별 스키마 정보를 리스트 형태로 생성
+    table_schemas = []
+    for table_info in user_tables:
+        try:
+            schema = db_manager.get_table_schema(table_info.get("TABLE_NAME", ""))
+            logger.debug(f"테이블 {table_info.get('TABLE_NAME', '')} 스키마: \n{schema}\n")
+            table_schemas.append(schema)
+        except Exception as e:
+            logger.warning(f"테이블 {table_info.get('TABLE_NAME', '')} 스키마 조회 실패: {e}")
+            continue
+
+    schema_info = json.dumps(table_schemas, ensure_ascii=False)
+    logger.debug(f"테이블 스키마 정보: \n{schema_info}\n")
+    return Response(
+        success=True,
+        data={
+            "database_name": database_name,
+            "table_list": table_list,
+            "table_schemas": table_schemas
+        }
+    )
+
 async def _natural_language_query_legacy(question: str):
     """기존 방식으로 자연어를 SQL로 변환합니다 (system prompt에 스키마 정보 포함)."""
     try:
-        # 데이터베이스 스키마 정보 가져오기
-        db_info = db_manager.get_database_info()
-        if "error" in db_info:
-            raise HTTPException(status_code=500, detail=f"데이터베이스 연결 오류: {db_info['error']}")
-        
-        # 현재 tools 지원 모델이 없으므로 기존 방식으로 스키마 정보 수집
-        schema_info = ""
-        # devdb 데이터베이스의 실제 테이블들만 사용
-        user_tables = [table for table in db_info.get("tables", []) 
-                      if not table.startswith('INFORMATION_SCHEMA') and 
-                         not table.startswith('mysql') and 
-                         not table.startswith('performance_schema') and
-                         not table.startswith('sys')]
-        
-        # 모든 사용자 테이블의 스키마 정보를 사용
-        for table_name in user_tables:
-            try:
-                schema = db_manager.get_table_schema(table_name)
-                schema_info += f"\n테이블: {table_name}\n"
-                for col in schema:
-                    col_type = col['DATA_TYPE']
-                    col_name = col['COLUMN_NAME']
-                    # 바이너리 타입인 경우 표시
-                    if 'binary' in col_type.lower() or 'blob' in col_type.lower():
-                        schema_info += f"  - {col_name} ({col_type}) [바이너리 데이터]\n"
-                    else:
-                        schema_info += f"  - {col_name} ({col_type})\n"
-            except Exception as e:
-                logger.warning(f"테이블 {table_name} 스키마 조회 실패: {e}")
-                continue
-        
-        # 시스템 프롬프트 구성 
-        database_name=db_info.get('database_name', 'unknown')
-
-        prompt = make_system_prompt(database_name, schema_info, question, False)
-       
-        logger.info(f"자연어 쿼리: \n\n[{question}]\n")
-        logger.debug(f"자연어 쿼리 프롬프트: \n{prompt}\n")
-        # AI를 사용하여 SQL 생성 (tools 없이)
-        sql_return = await ai_manager.generate_response(prompt)
-        
-        sql_query = strip_markdown_sql(sql_return)
-        
-        logger.debug(f"AI 응답 SQL: \n{sql_query}")
-        
-        # AI 응답이 실제 SQL 쿼리인지 확인
-        if not sql_query or sql_query.startswith("응답 생성 중 오류"):
+        # 테이블 목록과 스키마 정보 가져오기
+        result = await get_table_list_and_schema()
+        if "error" in result:
             return Response(
                 success=False,
-                error=f"SQL 생성 실패: {sql_query}"
+                error=f"테이블 스키마 조회 실패: {result['error']}"
             )
+        # result는 Response 객체이므로, result.data.get("database_name", "")로 가져와야 합니다.
+        database_name = result.data.get("database_name", "")
+        table_schemas = result.data.get("table_schemas", [])
+        if len(table_schemas) == 0:
+            return Response(
+                success=False,
+                error=f"테이블 스키마 조회 실패: {result['error']}"
+            )
+        schema_info = json.dumps(table_schemas, ensure_ascii=False)
+        system_prompt = make_system_prompt(database_name, schema_info, question, False)
+       
+        logger.info(f"자연어 쿼리: \n\n[{question}]\n")
+       
+        # AI를 사용하여 SQL 생성 (tools 없이)
+        # 기존 방식은 system과 user 메시지를 분리하여 전달
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
+        ]
+        logger.info(f"\n\n🚨===== AI API 호출 시작...\n")
+        logger.debug(f"\n>>> messages: \n{messages}\n")
         
-         
-        clean_sql = pretty_format_sql(sql_query)
+        import time
+        start_time = time.time()
+        #AI API 호출
+        response = await ai_manager.generate_response(messages)
+        elapsed_time = time.time() - start_time
+                        
+        logger.info(f"\n🚨===== AI 응답(시간:{elapsed_time:.2f}초), \n>>> response:\n{response}\n")
         
-        logger.debug(f"pretty_format_sql: \n{clean_sql}\n")
+        # AI 응답 정리 -> SQL 쿼리 추출
+        result_sql = await _make_clear_sql(response)
+        
+        # result_sql이 Response 객체인지 확인
+        if hasattr(result_sql, 'success') and not result_sql.success:
+            return result_sql  # 에러가 있으면 그대로 반환
+        
+        # 성공한 경우 data에서 sql_query 추출
+        clean_sql = result_sql.data.get("sql_query", "")
         
         # SQL 쿼리 실행
         try:
@@ -390,7 +484,7 @@ def make_system_prompt(database_name: str, schema_info: str, question: str, use_
 2.  **도구 사용(Tool Use) 단계:** 계획에 따라 필요한 도구를 반드시 사용해야 합니다.
     - **1순위:** `get_table_list()`를 반드시 호출하여 테이블 목록을 파악합니다.
     - **2순위:** 질문과 관련성이 높은 데이터베이스 테이블 들을 추론합니다. 
-    - **3순위:** 해당 테이블들에 대해서는 모두두 `get_table_schema("table_name")`를 호출(필수)하여 테이블 구조를 파악합니다. table_name은 반드시 영문으로 전달합닏다다.
+    - **3순위:** 해당 테이블들에 대해서는 모두 `get_table_schema("table_name")`를 호출(필수)하여 테이블 구조를 파악합니다. table_name은 반드시 영문으로 전달합니다.
     - **4순위:** 모든 정보가 수집되었다고 판단되면, SQL을 생성합니다.
 3.  **최종 답변(Final Answer) 단계:**
     - 모든 정보 수집이 완료되면, 분석한 내용을 바탕으로 **순수한 SQL 쿼리 하나만** 생성합니다.

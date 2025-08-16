@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config import config
+from database import DatabaseManager
 
 result = {
     'role': 'assistant', 
@@ -47,7 +48,7 @@ parsed_tool_calls = []
 
 
 
-result = result4
+result = result
 
 if 'tool_calls' in result:
     print("'tool_calls'가 result에 포함되어 있습니다.")
@@ -120,7 +121,9 @@ for tc in parsed_tool_calls:
 
     print(f"🧠 LLM 요청: 로컬 함수 {tc['tool_call_id']}, {func_name}, {index}, ({json.dumps(func_args, ensure_ascii=False)}) 실행")
 
-
+db_manager = DatabaseManager()
+table_list =   db_manager.get_table_list()
+print(table_list)
 
 
 

@@ -142,8 +142,22 @@ class DatabaseManager:
         """테이블 스키마 정보를 반환합니다."""
         if not self.is_connected():
             raise Exception("데이터베이스에 연결되지 않았습니다.")
-        
+        # 결과를 {"TABLE_NAME": ..., "TABLE_COMMENT": ..., "COLUMNS": [...] } 형태로 반환
         try:
+            # 테이블의 COMMENT(설명) 정보를 조회
+            table_comment_query = f"""
+            SELECT TABLE_COMMENT
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = '{config.MYSQL_DATABASE}'
+            AND TABLE_NAME = '{table_name}'
+            """
+            table_comment_result = self.execute_query(table_comment_query)
+            if table_comment_result and isinstance(table_comment_result, list):
+                table_comment = table_comment_result[0].get("TABLE_COMMENT", "")
+            else:
+                table_comment = ""
+
+            # 컬럼 정보 조회
             query = f"""
             SELECT 
                 COLUMN_NAME,
@@ -151,42 +165,58 @@ class DatabaseManager:
                 IS_NULLABLE,
                 COLUMN_DEFAULT,
                 COLUMN_KEY,
-                EXTRA
+                COLUMN_COMMENT
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE TABLE_SCHEMA = '{config.MYSQL_DATABASE}' 
             AND TABLE_NAME = '{table_name}'
             ORDER BY ORDINAL_POSITION
             """
-            
-            return self.execute_query(query)
-            
+            columns = self.execute_query(query)
+
+            # 결과 포맷 맞추기
+            result = {
+                "TABLE_NAME": table_name,
+                "TABLE_COMMENT": table_comment,
+                "COLUMNS": columns
+            }
+            return result
         except Exception as e:
             logger.error(f"테이블 스키마 조회 실패: {e}")
             raise Exception(f"테이블 스키마 조회 중 오류가 발생했습니다: {e}")
     
-    def get_table_list(self) -> List[str]:
+
+    
+    def get_table_list(self, database_name: str = None) -> List[str]:
         """데이터베이스의 모든 테이블 목록을 반환합니다."""
-        if not self.is_connected():
-            raise Exception("데이터베이스에 연결되지 않았습니다.")
         
         try:
-            # SHOW TABLES를 사용하여 현재 데이터베이스의 테이블만 조회
-            query = "SHOW TABLES"
+            if database_name is None:
+                database_name = config.MYSQL_DATABASE
             
+            logger.debug(f"데이터베이스 이름: {database_name}")
+            
+            # INFORMATION_SCHEMA.TABLES에서 테이블명과 COMMENT 조회
+            query = f"""
+            SELECT 
+                TABLE_NAME, 
+                TABLE_COMMENT
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = '{database_name}'
+            """
             result = self.execute_query(query)
-            # SHOW TABLES의 결과는 첫 번째 컬럼에 테이블명이 있음
-            table_names = []
+            # 결과를 [{TABLE_NAME, TABLE_COMMENT}, ...] 형태로 반환
+            table_list = []
             for row in result:
-                # 첫 번째 컬럼의 값을 가져옴
-                table_name = list(row.values())[0]
-                table_names.append(table_name)
-            
-            logger.info(f"테이블 목록 조회 성공: {len(table_names)}개 테이블")
-            return table_names
-            
+                table_list.append({
+                    "TABLE_NAME": row.get("TABLE_NAME", ""),
+                    "TABLE_COMMENT": row.get("TABLE_COMMENT", "")
+                })
+            logger.info(f"테이블 목록 및 COMMENT 조회 성공: {len(table_list)}개 테이블")
+            return table_list
         except Exception as e:
-            logger.error(f"테이블 목록 조회 실패: {e}")
-            raise Exception(f"테이블 목록 조회 중 오류가 발생했습니다: {e}")
+            logger.error(f"테이블 목록 및 COMMENT 조회 실패: {e}")
+            raise Exception(f"테이블 목록 및 COMMENT 조회 중 오류가 발생했습니다: {e}")
+
     
     def validate_query(self, query: str) -> bool:
         """SQL 쿼리의 유효성을 검사합니다."""
@@ -220,7 +250,7 @@ class DatabaseManager:
                 "host": config.MYSQL_HOST,
                 "port": config.MYSQL_PORT,
                 "user": config.MYSQL_USER,
-                "tables": self.get_table_list(),
+                "tables": self.get_table_list(config.MYSQL_DATABASE),
                 "connection_status": "connected"
             }
             

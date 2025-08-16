@@ -313,7 +313,7 @@ async def _natural_language_query_with_tools(question: str):
         
         while tool_call_count < max_tool_calls:
             # AI 응답 생성
-            response = await ai_manager.generate_response_with_tools(messages, tools)
+            response = await ai_manager.generate_response(messages, tools)
             
             if "error" in response:
                 logger.error(f"AI 응답 생성 실패: {response['error']}")
