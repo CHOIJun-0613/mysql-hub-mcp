@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 from config import config
 from database import DatabaseManager
+import sqlalchemy
+import os
 
 result = {
     'role': 'assistant', 

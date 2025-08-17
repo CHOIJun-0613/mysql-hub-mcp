@@ -5,6 +5,12 @@
 # Google ADK LLM Agent를 로드하고 구성하는 AgentWrapper 클래스를 정의합니다.
 # 이 클래스는 MCP 서버와 통신할 수 있으며 (HTTP 또는 STDIO를 통해),
 # 초기화 중에 각 서버별로 로드된 도구를 rich print를 사용하여 로깅합니다.
+#
+# 지원하는 LLM 제공업체:
+# - Google Gemini (기본)
+# - Ollama (로컬)
+# - LMStudio (로컬)
+# - OpenAI (클라우드)
 # ------------------------------------------------------------------------------
 
 import asyncio
@@ -21,15 +27,28 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerPa
 from google.adk.tools.mcp_tool import StdioConnectionParams
 
 # Non-Google LLM을 연결하기 위한 LiteLLM 래퍼
+# Ollama, LMStudio, OpenAI 등 다양한 LLM 제공업체를 지원합니다.
 from google.adk.models.lite_llm import LiteLlm
 
 # config.json 파일을 읽기 위한 유틸리티 함수
 from .utilities import read_config_json
 
 # 모델 이름 설정
+# Google Gemini 모델
 GEMINI_MODEL_NAME = "gemini-2.0-flash"
+
+# Ollama 로컬 모델들
 QWEN_MODEL_NAME = "ollama/qwen2.5-coder:latest"
 LLAMA_MODEL_NAME = "ollama/llama3.1:8b"
+
+# LMStudio 로컬 모델 (localhost:1234에서 실행)
+# LMStudio 사용 방법:
+# 1. LMStudio를 다운로드하고 설치: https://lmstudio.ai/
+# 2. LMStudio에서 qwen/qwen3-8b 모델을 다운로드
+# 3. LMStudio를 실행하고 모델을 로드
+# 4. API 서버를 시작 (기본 포트: 1234)
+# LMStudio는 OpenAI 호환 API를 제공하므로 'gpt-3.5-turbo'와 같은 모델명을 사용합니다.
+LMSTUDIO_QWEN_MODEL_NAME = "lm_studio/qwen/qwen3-8b"  # LMStudio에서 사용할 모델명
 
 SYSTEM_PROMPT = """
 ## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
@@ -139,10 +158,29 @@ class AgentWrapper:
         # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
         # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
         #local_llama_model = LiteLlm(model=LLAMA_MODEL_NAME)
-        llmodel = LiteLlm(model=QWEN_MODEL_NAME)
+        #llmodel = LiteLlm(model=QWEN_MODEL_NAME)
+        
+        # LMStudio를 사용하여 qwen/qwen3-8b 모델을 지정합니다.
+        # lmstudio_model = LiteLlm(
+        #     model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
+        #     api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
+        #     api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
+        # )
         
         # self.agent = LlmAgent(
         #     model=llmodel,  # agent를 구동할 모델 선택
+        #     name="mysql_assistant",
+        #     instruction=SYSTEM_PROMPT,
+        #     tools=toolsets
+        # )
+        
+        # 현재 활성화된 모델: LMStudio (OpenAI 호환 API)
+        # 다른 모델을 사용하려면 아래 주석 처리된 코드 중 하나를 활성화하고
+        # 현재 활성화된 코드를 주석 처리하세요.
+        
+        # LMStudio 모델을 사용하는 경우:
+        # self.agent = LlmAgent(
+        #     model=lmstudio_model,  # LMStudio의 OpenAI 호환 API 사용
         #     name="mysql_assistant",
         #     instruction=SYSTEM_PROMPT,
         #     tools=toolsets

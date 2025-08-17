@@ -258,13 +258,163 @@ class OllamaProvider(AIProvider):
             logger.error(f"Ollama 연결 테스트 실패: {e}")
             return False
 
+class LMStudioProvider(AIProvider):
+    """LM Studio AI Provider"""
+    
+    def __init__(self):
+        self.base_url = config.LMSTUDIO_BASE_URL
+        self.model = config.LMSTUDIO_MODEL
+        self._initialize_client()
+    
+    def _initialize_client(self):
+        """LM Studio 클라이언트를 초기화합니다."""
+        try:
+            logger.info(f"LM Studio 클라이언트가 초기화되었습니다. 모델: {self.model}")
+        except Exception as e:
+            logger.error(f"LM Studio 클라이언트 초기화 실패: {e}")
+    
+    async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """LM Studio를 사용하여 응답을 생성합니다."""
+        try:
+            # OpenAI 호환 API 형식으로 요청
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": 4096,
+                "temperature": 0.1,
+                "stream": False
+            }
+            
+            # Tool이 있으면 추가
+            if tools:
+                payload["tools"] = tools
+                payload["tool_choice"] = "auto"
+            
+            logger.debug(f"LM Studio API 호출 시작: {self.base_url}/chat/completions")
+            logger.debug(f"모델: {self.model}")
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=300.0
+                )
+                
+                logger.debug(f"LM Studio API 응답 상태: {response.status_code}")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    if tools:
+                        # Tool 사용 방식
+                        message = result.get("choices", [{}])[0].get("message", {})
+                        
+                        # UTF-8 인코딩 문제 해결
+                        if "content" in message and isinstance(message["content"], str):
+                            content = message["content"]
+                            if isinstance(content, bytes):
+                                content = content.decode('utf-8', errors='ignore')
+                            elif isinstance(content, str):
+                                content = content.encode('utf-8', errors='ignore').decode('utf-8')
+                            
+                            # 제어 문자 제거
+                            import re
+                            content = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', content)
+                            message["content"] = content
+                        
+                        return message
+                    else:
+                        # 기존 방식
+                        response_text = result.get("choices", [{}])[0].get("message", {}).get("content", "응답이 없습니다.")
+                        
+                        # UTF-8 인코딩 문제 해결
+                        try:
+                            if isinstance(response_text, bytes):
+                                response_text = response_text.decode('utf-8', errors='ignore')
+                            elif isinstance(response_text, str):
+                                response_text = response_text.encode('utf-8', errors='ignore').decode('utf-8')
+                            
+                            # 제어 문자 제거
+                            import re
+                            response_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', response_text)
+                            return {"content": response_text}
+                        except Exception as e:
+                            logger.error(f"응답 텍스트 정리 중 오류: {e}")
+                            return {"error": "SQL 쿼리 생성 중 오류가 발생했습니다."}
+                else:
+                    error_msg = f"LM Studio API 오류: {response.status_code} - {response.text}"
+                    logger.error(error_msg)
+                    return {"error": error_msg}
+                    
+        except httpx.TimeoutException:
+            error_msg = "LM Studio API 호출 시간 초과"
+            logger.error(error_msg)
+            return {"error": error_msg}
+        except httpx.ConnectError:
+            error_msg = "LM Studio 서버에 연결할 수 없습니다"
+            logger.error(error_msg)
+            return {"error": error_msg}
+        except Exception as e:
+            error_msg = f"LM Studio 응답 생성 실패: {e}"
+            logger.error(error_msg)
+            return {"error": error_msg}
+    
+    def is_available(self) -> bool:
+        """LM Studio가 사용 가능한지 확인합니다."""
+        try:
+            # 간단한 연결 테스트
+            async def test_connection():
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(f"{self.base_url}/models", timeout=5.0)
+                        if response.status_code == 200:
+                            data = response.json()
+                            models = data.get("data", [])
+                            available_models = [model.get("id", "") for model in models]
+                            logger.info(f"사용 가능한 LM Studio 모델[{self.model}]: {available_models}")
+                           
+                            if self.model in available_models:
+                                return True
+                            else:
+                                logger.warning(f"요청한 모델 '{self.model}'을 찾을 수 없습니다.")
+                                return False
+                        else:
+                            logger.error(f"LM Studio API 응답 오류: {response.status_code}")
+                            return False
+                except Exception as e:
+                    logger.error(f"LM Studio 연결 테스트 중 오류: {e}")
+                    return False
+            
+            # 동기적으로 실행
+            try:
+                # 현재 이벤트 루프가 있는지 확인
+                try:
+                    loop = asyncio.get_running_loop()
+                    # 이미 실행 중인 루프가 있으면 새 스레드에서 실행
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, test_connection())
+                        return future.result()
+                except RuntimeError:
+                    # 실행 중인 루프가 없으면 직접 실행
+                    return asyncio.run(test_connection())
+            except Exception as e:
+                logger.error(f"이벤트 루프 실행 오류: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"LM Studio 연결 테스트 실패: {e}")
+            return False
+
 class AIProviderManager:
     """AI Provider 관리자"""
     
     def __init__(self):
         self.providers: Dict[str, AIProvider] = {
             "groq": GroqProvider(),
-            "ollama": OllamaProvider()
+            "ollama": OllamaProvider(),
+            "lmstudio": LMStudioProvider()
         }
         self.current_provider = config.AI_PROVIDER.lower()
         

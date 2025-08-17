@@ -54,7 +54,7 @@ class Config:
     MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "")
     
-    # AI Provider 설정 (groq, ollama)
+    # AI Provider 설정 (groq, ollama, lmstudio)
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "ollama")
     
     # LLM Tool 사용 설정
@@ -64,7 +64,9 @@ class Config:
     GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-8b-8192")
     
-
+    # LM Studio 설정
+    LMSTUDIO_BASE_URL: str = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+    LMSTUDIO_MODEL: str = os.getenv("LMSTUDIO_MODEL", "qwen/qwen3-8b")
     
     # Ollama 설정
     OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")

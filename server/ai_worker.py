@@ -81,10 +81,14 @@ async def natural_language_query_work(question: str, use_tools: bool):
         # Tool 사용 여부에 따라 분기 처리
         if use_tools:
             # Tool 사용 방식
-            return await _natural_language_query_with_tools(question)
+            response = await _natural_language_query_with_tools(question)
+            logger.info(f"\n\n🚨===== LLM + Tool 사용 처리 결과: \n{response}\n")
+            return response
         else:
             # 기존 방식 - system prompt에 스키마 정보 포함
-            return await _natural_language_query_legacy(question)
+            response = await _natural_language_query_legacy(question)
+            logger.info(f"\n\n🚨===== LLM + Tool 비사용 처리 결과: \n{response}\n")
+            return response
             
     except Exception as e:
         logger.error(f"자연어 쿼리 처리 중 오류: {e}")
@@ -183,11 +187,11 @@ async def _natural_language_query_with_tools(question: str):
         
         # 3. 에이전트 루프 시작
         while tool_call_count < max_tool_calls:
-            if config.AI_PROVIDER == "groq" and tool_call_count > 0:
+            if config.AI_PROVIDER in ["groq"] and tool_call_count > 0:
                 import time
                 time.sleep(30)
                 
-            logger.info("\n\n🚨===== AI API 호출 시작...\n")
+            logger.info(f"\n\n🚨===== AI API 호출 시작... (Provider: {config.AI_PROVIDER})\n")
             # Tool 결과가 있으면 추가
             if tool_results:
                 for result in tool_results:
@@ -230,25 +234,44 @@ async def _natural_language_query_with_tools(question: str):
                     success=False,
                     error="AI 응답 형식이 올바르지 않습니다."
                 )
-
             
             if "tool_calls" not in response or not response["tool_calls"]: 
                 logger.debug(f"\n>>> 최종 답변 감지: \n")
                 # 4. LLM이 도구 사용 대신 최종 답변을 한 경우 -> 루프 종료
                 return await _finalize_sql_response(response)
-            else:
-                logger.debug(f"\n>>> 도구 호출 감지: \n{(tool_call_count+1)} 회차\n")
-                result = await _exec_tool_response(response)
-                if "error" in result:
+            elif "tool_calls" in response:
+                # tool_calls가 빈 리스트인 경우 (최종 답변)
+                if isinstance(response["tool_calls"], list) and len(response["tool_calls"]) == 0:
+                    logger.debug(f"\n>>> tool_calls가 빈 리스트([])입니다. 최종 답변으로 처리합니다.\n")
+                    return await _finalize_sql_response(response)
+                # tool_calls에 값이 채워져 있는 경우 (도구 호출)
+                elif isinstance(response["tool_calls"], list) and len(response["tool_calls"]) > 0:
+                    logger.debug(f"\n>>> 도구 호출 감지: \n{(tool_call_count+1)} 회차\n")
+                    result = await _exec_tool_response(response)
+                    if "error" in result:
+                        return Response(
+                            success=False,
+                            error=f"Tool 실행 오류: {result['error']}"
+                        )
+                    # result가 리스트이므로, 각 결과를 tool_results에 append
+                    for r in result:
+                        tool_results.append(r)
+                    
+                    tool_call_count += 1
+                else:
+                    # tool_calls가 리스트가 아닌 경우 등 비정상 응답
+                    logger.error(f"AI 응답의 tool_calls 필드가 올바르지 않습니다: {response['tool_calls']}")
                     return Response(
                         success=False,
-                        error=f"Tool 실행 오류: {result['error']}"
+                        error="AI 응답의 tool_calls 필드가 올바르지 않습니다."
                     )
-                # result가 리스트이므로, 각 결과를 tool_results에 append
-                for r in result:
-                    tool_results.append(r)
-                
-                tool_call_count += 1
+            else:
+                # 잘못된 응답 (tool_calls 필드가 없음)
+                logger.error(f"AI 응답에 tool_calls 필드가 없습니다: {response}")
+                return Response(
+                    success=False,
+                    error="AI 응답에 tool_calls 필드가 없습니다."
+                )
         # 최대 Tool 호출 횟수 초과
         return Response(
             success=False,
@@ -420,7 +443,7 @@ async def _natural_language_query_legacy(question: str):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question}
         ]
-        logger.info(f"\n\n🚨===== AI API 호출 시작...\n")
+        logger.info(f"\n\n🚨===== AI API 호출 시작... (Provider: {config.AI_PROVIDER})\n")
         logger.debug(f"\n>>> messages: \n{messages}\n")
         
         import time

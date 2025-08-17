@@ -6,7 +6,7 @@ MySQL 데이터베이스와 자연어 쿼리를 지원하는 MCP 서버입니다
 
 - MySQL 데이터베이스 연결 및 쿼리 실행
 - 자연어를 SQL로 변환
-- AI Provider 지원 (Groq, Ollama)
+- AI Provider 지원 (Groq, Ollama, LM Studio)
 - Tool 지원 LLM을 통한 지능형 데이터베이스 쿼리
 
 ## 설치 및 설정
@@ -23,12 +23,16 @@ MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=your_database
 
-# AI Provider 설정 (groq 또는 ollama)
+# AI Provider 설정 (groq, ollama, lmstudio)
 AI_PROVIDER=ollama
 
 # Groq 설정
 GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama3-8b-8192
+
+# LM Studio 설정
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=qwen/qwen3-8b
 
 # Ollama 설정
 # Tool 지원 모델: qwen2.5-coder, llama3.1:8b, codellama:7b 등
@@ -56,9 +60,40 @@ cd ../client
 pip install -r requirements.txt
 ```
 
-### 3. Ollama Tool 지원 모델 설정
+### 3. AI Provider 설정
 
-**qwen2.5-coder 모델 사용 (권장):**
+#### LM Studio 설정 (권장)
+
+**LM Studio 설치 및 실행:**
+1. [LM Studio 공식 사이트](https://lmstudio.ai/)에서 다운로드
+2. LM Studio 실행 후 "qwen/qwen3-8b" 모델 다운로드
+3. 모델 실행 (Local Server 탭에서 Start Server 클릭)
+4. 기본 포트는 1234이며, API는 `http://localhost:1234/v1`에서 접근 가능
+
+**환경 변수 설정:**
+```env
+AI_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_MODEL=qwen/qwen3-8b
+```
+
+**연결 테스트:**
+```bash
+# 사용 가능한 모델 확인
+curl http://localhost:1234/v1/models
+
+# 간단한 쿼리 테스트
+curl -X POST http://localhost:1234/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen/qwen3-8b",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+#### Ollama Tool 지원 모델 설정
+
+**qwen2.5-coder 모델 사용:**
 ```bash
 # qwen2.5-coder 모델 다운로드
 ollama pull qwen2.5-coder
@@ -82,6 +117,15 @@ curl -X POST http://localhost:11434/api/chat \
     "messages": [{"role": "user", "content": "Hello"}],
     "tools": [{"type": "function", "function": {"name": "test", "description": "test"}}]
   }'
+```
+
+#### Groq 설정
+
+**API 키 설정:**
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=qwen/qwen3-32b
 ```
 
 ## 사용법
@@ -177,6 +221,27 @@ python run_client.py
 
 ### Tool 지원이 작동하지 않는 경우
 
+#### LM Studio 문제 해결
+
+1. **LM Studio 서버 상태 확인:**
+   ```bash
+   curl http://localhost:1234/v1/models
+   ```
+
+2. **모델 실행 상태 확인:**
+   - LM Studio에서 Local Server 탭 확인
+   - 모델이 실행 중인지 확인
+   - 포트 1234가 사용 가능한지 확인
+
+3. **환경 변수 확인:**
+   ```env
+   AI_PROVIDER=lmstudio
+   LMSTUDIO_BASE_URL=http://localhost:1234/v1
+   LMSTUDIO_MODEL=qwen/qwen3-8b
+   ```
+
+#### Ollama 문제 해결
+
 1. **Ollama 모델 확인:**
    ```bash
    ollama list
@@ -203,6 +268,31 @@ python run_client.py
 1. MySQL 서비스가 실행 중인지 확인
 2. `.env` 파일의 데이터베이스 설정 확인
 3. 사용자 권한 확인
+
+### AI Provider 전환
+
+**Provider 전환 API 사용:**
+```bash
+# LM Studio로 전환
+curl -X POST http://localhost:8000/ai/switch-provider \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "lmstudio"}'
+
+# Ollama로 전환
+curl -X POST http://localhost:8000/ai/switch-provider \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "ollama"}'
+
+# Groq로 전환
+curl -X POST http://localhost:8000/ai/switch-provider \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "groq"}'
+```
+
+**현재 Provider 확인:**
+```bash
+curl http://localhost:8000/ai/provider
+```
 
 ## 라이선스
 
