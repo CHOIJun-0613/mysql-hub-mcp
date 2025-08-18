@@ -34,7 +34,6 @@ class GroqProvider(AIProvider):
     def __init__(self):
         self.client = None
         self.model = config.GROQ_MODEL
-        self._initialize_client()
     
     def _initialize_client(self):
         """Groq 클라이언트를 초기화합니다."""
@@ -47,6 +46,10 @@ class GroqProvider(AIProvider):
             logger.info(f"Groq 클라이언트가 초기화되었습니다. 모델: {self.model}")
         except Exception as e:
             logger.error(f"Groq 클라이언트 초기화 실패: {e}")
+    
+    def constructor(self):
+        """외부에서 호출할 수 있는 초기화 메서드입니다."""
+        self._initialize_client()
     
     async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Groq를 사용하여 응답을 생성합니다."""
@@ -98,7 +101,6 @@ class OllamaProvider(AIProvider):
     def __init__(self):
         self.url = config.OLLAMA_URL
         self.model = config.OLLAMA_MODEL
-        self._initialize_client()
     
     def _initialize_client(self):
         """Ollama 클라이언트를 초기화합니다."""
@@ -106,6 +108,10 @@ class OllamaProvider(AIProvider):
             logger.info(f"Ollama 클라이언트가 초기화되었습니다. 모델: {self.model}")
         except Exception as e:
             logger.error(f"Ollama 클라이언트 초기화 실패: {e}")
+    
+    def constructor(self):
+        """외부에서 호출할 수 있는 초기화 메서드입니다."""
+        self._initialize_client()
     
     async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Ollama를 사용하여 응답을 생성합니다."""
@@ -223,8 +229,9 @@ class OllamaProvider(AIProvider):
                             data = response.json()
                             models = data.get("models", [])
                             available_models = [model.get("name", "") for model in models]
-                            logger.info(f"사용 가능한 Ollama 모델[{self.model}]: {available_models}")
-                           
+
+                            logger.info(f"\n🚨===== Ollama 모델 실행모델: [{self.model}]")
+                            logger.debug(f" Ollama 사용가능 모델: \n{available_models}\n ")                               
                             if self.model in available_models:
                                 return True
                             else:
@@ -264,7 +271,6 @@ class LMStudioProvider(AIProvider):
     def __init__(self):
         self.base_url = config.LMSTUDIO_BASE_URL
         self.model = config.LMSTUDIO_MODEL
-        self._initialize_client()
     
     def _initialize_client(self):
         """LM Studio 클라이언트를 초기화합니다."""
@@ -272,6 +278,10 @@ class LMStudioProvider(AIProvider):
             logger.info(f"LM Studio 클라이언트가 초기화되었습니다. 모델: {self.model}")
         except Exception as e:
             logger.error(f"LM Studio 클라이언트 초기화 실패: {e}")
+    
+    def constructor(self):
+        """외부에서 호출할 수 있는 초기화 메서드입니다."""
+        self._initialize_client()
     
     async def generate_response(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """LM Studio를 사용하여 응답을 생성합니다."""
@@ -372,8 +382,8 @@ class LMStudioProvider(AIProvider):
                             data = response.json()
                             models = data.get("data", [])
                             available_models = [model.get("id", "") for model in models]
-                            logger.info(f"사용 가능한 LM Studio 모델[{self.model}]: {available_models}")
-                           
+                            logger.info(f"\n🚨===== LM Studio 실행모델: [{self.model}]")
+                            logger.debug(f"LM Studio 사용가능 모델: \n{available_models}\n ")    
                             if self.model in available_models:
                                 return True
                             else:

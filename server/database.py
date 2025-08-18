@@ -23,6 +23,7 @@ class DatabaseManager:
     
     def constructor(self):
         """데이터베이스 연결을 초기화합니다."""
+
         self._initialize_connection()
     
     def _initialize_connection(self):
@@ -47,7 +48,7 @@ class DatabaseManager:
                 conn.execute(text("SET character_set_connection=utf8mb4"))
                 conn.execute(text("SELECT 1"))
             
-            logger.info("MySQL 데이터베이스 연결이 성공적으로 초기화되었습니다.")
+            logger.info("\n🚨===== 데이터베이스[MySQL] 연결이 성공적으로 초기화되었습니다.")
             
         except Exception as e:
             logger.error(f"MySQL 데이터베이스 연결 초기화 실패: {e}")
