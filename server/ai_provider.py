@@ -417,7 +417,9 @@ class AIProviderManager:
             "lmstudio": LMStudioProvider()
         }
         self.current_provider = config.AI_PROVIDER.lower()
-        
+    
+    def constructor(self):
+        """AI Provider들을 초기화합니다."""
         # 현재 Provider가 사용 불가능한 경우 다른 Provider로 자동 전환
         if not self.providers[self.current_provider].is_available():
             self._switch_to_available_provider()
@@ -458,6 +460,24 @@ class AIProviderManager:
         else:
             logger.error(f"알 수 없는 Provider: {provider_name}")
             return False
+
+    def cleanup(self):
+        """AI Provider들을 안전하게 정리합니다."""
+        try:
+            for provider_name, provider in self.providers.items():
+                if hasattr(provider, 'cleanup'):
+                    try:
+                        provider.cleanup()
+                        logger.info(f"{provider_name} Provider가 정리되었습니다.")
+                    except Exception as e:
+                        logger.warning(f"{provider_name} Provider 정리 중 오류: {e}")
+                else:
+                    logger.debug(f"{provider_name} Provider는 cleanup 메서드가 없습니다.")
+            
+            logger.info("모든 AI Provider가 정리되었습니다.")
+            
+        except Exception as e:
+            logger.error(f"AI Provider 정리 중 오류 발생: {e}")
 
 # 전역 AI Provider Manager 인스턴스
 ai_manager = AIProviderManager() 

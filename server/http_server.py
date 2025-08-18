@@ -5,20 +5,79 @@ FastAPI를 사용하여 HTTP API를 제공합니다.
 
 import re
 import logging
+import signal
+import sys
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pydantic.networks import KafkaDsn
 import uvicorn
 
 from config import config
 from database import db_manager
 from ai_provider import ai_manager
-from ai_worker import strip_markdown_sql, natural_language_query_work
-from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, AIProviderRequest, Response
+from ai_worker import strip_markdown_sql, natural_language_query_work, make_clear_sql
+from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, check_init_environment
+from common import AIProviderRequest, Response, clear_screen
 
+# stdout clear
+#clear_screen()
 
 logger = logging.getLogger(__name__)
+
+def signal_handler(signum, frame):
+    """시그널 핸들러: Ctrl+C 등의 시그널을 처리합니다."""
+    logger.info(f"시그널 {signum}을 받았습니다. HTTP 서버를 안전하게 종료합니다...")
+    
+    # 데이터베이스 연결 정리
+    try:
+        if hasattr(db_manager, 'close_connection'):
+            db_manager.close_connection()
+            logger.info("데이터베이스 연결이 정리되었습니다.")
+    except Exception as e:
+        logger.warning(f"데이터베이스 연결 정리 중 오류: {e}")
+    
+    # AI 매니저 정리
+    try:
+        if hasattr(ai_manager, 'cleanup'):
+            ai_manager.cleanup()
+            logger.info("AI 매니저가 정리되었습니다.")
+    except Exception as e:
+        logger.warning(f"AI 매니저 정리 중 오류: {e}")
+    
+    logger.info("\n\n🚨=====[HTTP] 서버가 안전하게 종료되었습니다.\n\n")
+    
+    sys.exit(0)
+
+def _cleanup_resources():
+    """리소스 정리 작업을 수행합니다."""
+    logger.info("리소스 정리 작업을 시작합니다...")
+    
+    # 데이터베이스 연결 정리
+    try:
+        if hasattr(db_manager, 'close_connection'):
+            db_manager.close_connection()
+            logger.info("데이터베이스 연결이 정리되었습니다.")
+    except Exception as e:
+        logger.warning(f"데이터베이스 연결 정리 중 오류: {e}")
+    
+    # AI 매니저 정리
+    try:
+        if hasattr(ai_manager, 'cleanup'):
+            ai_manager.cleanup()
+            logger.info("AI 매니저가 정리되었습니다.")
+    except Exception as e:
+        logger.warning(f"AI 매니저 정리 중 오류: {e}")
+    
+    # 로깅 정리
+    try:
+        logging.shutdown()
+        logger.info("로깅 시스템이 정리되었습니다.")
+    except Exception as e:
+        logger.warning(f"로깅 시스템 정리 중 오류: {e}")
+    
+    logger.info("모든 리소스 정리 작업이 완료되었습니다.")
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -36,7 +95,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.on_event("startup")
 async def startup_event():
     """서버 시작 시 실행되는 이벤트"""
@@ -48,6 +106,12 @@ async def startup_event():
     # 데이터베이스 연결 확인
     if not db_manager.is_connected():
         logger.error("데이터베이스에 연결할 수 없습니다.")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """서버 종료 시 실행되는 이벤트"""
+    logger.info("HTTP 서버가 종료되고 있습니다. 리소스를 정리합니다...")
+    _cleanup_resources()
 
 @app.get("/")
 async def root():
@@ -75,10 +139,10 @@ async def get_database_info():
     """데이터베이스 정보를 반환합니다."""
     try:
         info = db_manager.get_database_info()
-        logger.debug(f"데이터베이스 정보 조회 결과: {info}")
+        logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{info}\n")
         return Response(success=True, data=info)
     except Exception as e:
-        logger.error(f"데이터베이스 정보 조회 실패: {e}")
+        logger.error(f"🚨=====[HTTP] 데이터베이스 정보 조회 실패: {e}")
         return Response(success=False, error=str(e))
 
 @app.post("/database/execute")
@@ -90,10 +154,10 @@ async def execute_sql(request: SQLQueryRequest):
         
         # 마크다운 형식 제거
         clean_query = strip_markdown_sql(request.query)
-        logger.info(f"원본 SQL: {request.query}")
-        logger.info(f"정리된 SQL: {clean_query}")
+        logger.info(f"🚨=====[HTTP] 원본 SQL: \n{request.query}\n")
+        logger.info(f"🚨=====[HTTP] 정리된 SQL: \n{clean_query}\n")
         
-        # SQL 키워드가 포함되어 있는지 확인
+        # # SQL 키워드가 포함되어 있는지 확인
         sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP"]
         if not any(keyword.lower() in clean_query.lower() for keyword in sql_keywords):
             raise HTTPException(status_code=400, detail="유효한 SQL 쿼리가 아닙니다.")
@@ -122,13 +186,13 @@ async def execute_sql(request: SQLQueryRequest):
             affected_rows = db_manager.execute_non_query(clean_query)
             result = {"affected_rows": affected_rows}
         
-        logger.debug(f"SQL 실행 결과: {result}")
+        logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{result}\n")
         return Response(success=True, data=result)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SQL 실행 실패: {e}")
+        logger.error(f"🚨=====[HTTP] SQL 실행 실패: {e}")
         return Response(success=False, error=str(e))
 
 @app.post("/database/natural-query")
@@ -141,10 +205,13 @@ async def natural_language_query(request: NaturalLanguageRequest):
         if request.question.isdigit() or len(request.question.strip()) < 5:
             raise HTTPException(status_code=400, detail="질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
         
-        return await natural_language_query_work(request.question, config.USE_LLM_TOOLS)
+        response = await natural_language_query_work(request.question, config.USE_LLM_TOOLS)
+
+        logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{response}\n")
+        return Response(success=True, data=response)
             
     except Exception as e:
-        logger.error(f"자연어 쿼리 처리 중 오류: {e}")
+        logger.error(f"🚨=====[HTTP] 자연어 쿼리 처리 중 오류: {e}")
         return Response(
             success=False,
             error=f"자연어 쿼리 처리 중 오류가 발생했습니다: {e}"
@@ -155,10 +222,10 @@ async def get_table_list():
     """테이블 목록을 반환합니다."""
     try:
         tables = db_manager.get_table_list()
-        logger.debug(f"테이블 목록 조회 결과: {tables}")
+        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{tables}\n")
         return Response(success=True, data=tables)
     except Exception as e:
-        logger.error(f"테이블 목록 조회 실패: {e}")
+        logger.error(f"🚨=====[HTTP] 테이블 목록 조회 실패: {e}")
         return Response(success=False, error=str(e))
 
 @app.post("/database/table-schema")
@@ -169,13 +236,13 @@ async def get_table_schema(request: TableSchemaRequest):
             raise HTTPException(status_code=400, detail="테이블 이름이 제공되지 않았습니다.")
         
         schema = db_manager.get_table_schema(request.table_name)
-        logger.debug(f"테이블 스키마 조회 결과: {schema}")
+        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{schema}\n")
         return Response(success=True, data=schema)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"테이블 스키마 조회 실패: {e}")
+        logger.error(f"🚨=====[HTTP] 테이블 스키마 조회 실패: {e}")
         return Response(success=False, error=str(e))
 
 @app.get("/ai/provider")
@@ -184,10 +251,10 @@ async def get_current_ai_provider():
     try:
         provider = ai_manager.get_current_provider()
         provider_data = {"provider": provider}
-        logger.debug(f"AI Provider 정보 조회 결과: {provider_data}")
+        logger.info(f"🚨=====[HTTP] AI Provider 정보 조회 결과: \n{provider_data}\n")
         return Response(success=True, data=provider_data)
     except Exception as e:
-        logger.error(f"AI Provider 정보 조회 실패: {e}")
+        logger.error(f"🚨=====[HTTP] AI Provider 정보 조회 실패: {e}")
         return Response(success=False, error=str(e))
 
 @app.post("/ai/switch-provider")
@@ -197,30 +264,57 @@ async def switch_ai_provider(request: AIProviderRequest):
         success = ai_manager.switch_provider(request.provider)
         if success:
             provider_data = {"provider": ai_manager.get_current_provider()}
-            logger.debug(f"AI Provider 전환 성공 결과: {provider_data}")
+            logger.info(f"🚨=====[HTTP] AI Provider 전환 성공 결과: \n{provider_data}\n")
             return Response(
                 success=True,
                 data=provider_data
             )
         else:
-            logger.debug(f"AI Provider 전환 실패: {request.provider}")
+            logger.info(f"🚨=====[HTTP] AI Provider 전환 실패: {request.provider}")
             return Response(
                 success=False,
                 error=f"Provider 전환 실패: {request.provider}"
             )
     except Exception as e:
-        logger.error(f"AI Provider 전환 실패: {e}")
+        logger.error(f"🚨=====[HTTP] AI Provider 전환 실패: {e}")
         return Response(success=False, error=str(e))
     
 def run_http_server():
     """HTTP 서버를 실행합니다."""
-    uvicorn.run(
-        app,
-        host=config.HTTP_SERVER_HOST,
-        port=config.HTTP_SERVER_PORT,
-        log_level="DEBUG"
-        
-    )
+    # 시그널 핸들러 등록 (Windows 호환성 고려)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # Windows가 아닌 경우에만 SIGTERM 등록
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, signal_handler)
+    
+    logger.info(f"🚨=====[HTTP] HTTP 서버를 시작합니다...")
+    logger.info(f"🚨=====[HTTP] 호스트: {config.HTTP_SERVER_HOST} 포트: {config.HTTP_SERVER_PORT}")
+    #check_init_environment(db_manager, "HTTP", ai_manager, config)
+    try:
+        uvicorn.run(
+            app,
+            host=config.HTTP_SERVER_HOST,
+            port=config.HTTP_SERVER_PORT,
+            log_level="INFO"
+        )
+    except KeyboardInterrupt:
+        logger.info("Ctrl+C를 받았습니다. HTTP 서버를 종료합니다...")
+    except Exception as e:
+        logger.error(f"HTTP 서버 실행 중 오류 발생: {e}")
+    finally:
+        # 정리 작업 수행
+        _cleanup_resources()
+        logger.info("🚨=====[HTTP] 서버가 완전히 종료되었습니다.")
 
 if __name__ == "__main__":
-    run_http_server() 
+    try:
+        run_http_server()
+        
+    except KeyboardInterrupt:
+        logger.info("🚨=====[HTTP] 메인 스레드에서 Ctrl+C를 받았습니다.")
+        _cleanup_resources()
+    except Exception as e:
+        logger.error(f"🚨=====[HTTP] 예상치 못한 오류 발생: {e}")
+        _cleanup_resources()
+        sys.exit(1) 

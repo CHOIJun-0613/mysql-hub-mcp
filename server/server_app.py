@@ -14,6 +14,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from mcp_server import run_mcp_server
 from http_server import run_http_server
+from common import clear_screen
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,9 @@ class ServerApp:
 
 def main():
     """메인 함수"""
+    # stdout을 clear하고 시작
+    #clear_screen()
+    
     parser = argparse.ArgumentParser(description="MySQL Hub MCP Server")
     parser.add_argument(
         "--mode",
@@ -121,18 +125,9 @@ def main():
         # 로깅 설정
         config.setup_logging()
         
-        logger.info("MySQL Hub MCP Server를 시작합니다.")
-        logger.info(f"실행 모드: {args.mode}")
-        logger.info(f"AI Provider: {ai_manager.get_current_provider()}")
-        logger.info(f"HTTP 서버: http://{config.HTTP_SERVER_HOST}:{config.HTTP_SERVER_PORT}")
-        logger.info(f"log level : {config.LOG_LEVEL}")
-
-        
-        # 데이터베이스 연결 확인
-        if not db_manager.is_connected():
-            logger.error("데이터베이스에 연결할 수 없습니다.")
-            logger.error("환경 변수를 확인하거나 .env 파일을 설정해주세요.")
-            sys.exit(1)
+        # 환경 초기화 (데이터베이스 연결 및 AI Provider 초기화)
+        from common import init_environment
+        init_environment(db_manager, ai_manager)
         
         # 서버 애플리케이션 생성
         app = ServerApp()
@@ -144,7 +139,9 @@ def main():
             asyncio.run(app.run_http_only())
         elif args.mode == "mcp":
             asyncio.run(app.run_mcp_only())
-        
+            
+
+      
     except KeyboardInterrupt:
         logger.info("사용자에 의해 서버가 중단되었습니다.")
     except Exception as e:

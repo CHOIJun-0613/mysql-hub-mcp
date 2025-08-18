@@ -96,7 +96,7 @@ async def natural_language_query_work(question: str, use_tools: bool):
             success=False,
             error=f"자연어 쿼리 처리 중 오류가 발생했습니다: {e}"
         )
-async def _make_clear_sql(response: Dict[str, Any]) :
+async def make_clear_sql(response: Dict[str, Any]) :
     # AI 응답이 실제 SQL 쿼리인지 더 엄격하게 확인
     if not response:
         logger.error(f"\n>>> make_clear_sql() response is None")
@@ -104,7 +104,7 @@ async def _make_clear_sql(response: Dict[str, Any]) :
             success=False,
             error=" make_clear_sql() response is None"
         )
-    logger.debug(f"\n>>> _make_clear_sql(response): \n{response}\n")
+    logger.debug(f"\n>>> make_clear_sql(response): \n{response}\n")
     content = ""
 
     # sql_return이 딕셔너리인지 확인
@@ -154,14 +154,13 @@ async def _make_clear_sql(response: Dict[str, Any]) :
     
     logger.debug(f"pretty_format_sql: \n{clean_sql}\n")
     
-    logger.debug(f"\n>>> _make_clear_sql(clean_sql): \n{clean_sql}\n")
+    logger.debug(f"\n>>> make_clear_sql(clean_sql): \n{clean_sql}\n")
     return Response(
         success=True,
         data={
             "sql_query": clean_sql
         }
     )
-          
 async def _natural_language_query_with_tools(question: str):
     """Tool을 사용하여 자연어를 SQL로 변환합니다."""
     try:
@@ -299,7 +298,7 @@ async def _finalize_sql_response(response: Dict[str, Any]) :
         logger.debug("content가 tool_calls와 동일한 JSON 함수 호출 형식입니다. 루프를 계속 진행합니다.")
     else:
         # AI 응답 정리 -> SQL 쿼리 추출
-        result_sql = await _make_clear_sql(response)
+        result_sql = await make_clear_sql(response)
         logger.debug(f"\n>>> result_sql: \n{result_sql}\n")
         # result_sql이 Response 객체인지 확인
         if hasattr(result_sql, 'success') and not result_sql.success:
@@ -455,7 +454,7 @@ async def _natural_language_query_legacy(question: str):
         logger.info(f"\n🚨===== AI 응답(시간:{elapsed_time:.2f}초), \n>>> response:\n{response}\n")
         
         # AI 응답 정리 -> SQL 쿼리 추출
-        result_sql = await _make_clear_sql(response)
+        result_sql = await make_clear_sql(response)
         
         # result_sql이 Response 객체인지 확인
         if hasattr(result_sql, 'success') and not result_sql.success:

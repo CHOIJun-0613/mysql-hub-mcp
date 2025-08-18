@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import logging
+import os
+import sys
+#from database import db_manager
+#from ai_provider import ai_manager
+#from config import config   
 
 logger = logging.getLogger(__name__)
 
@@ -63,3 +68,37 @@ class Response(BaseModel):
             # 최후의 수단: ASCII로 변환
             return text.encode('ascii', errors='ignore').decode('ascii')
 
+def clear_screen():
+    """화면을 지우는 함수"""
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        os.system('clear')
+def init_environment(db_manager, ai_manager):
+    """어플리케이션 실행될 수 있도록 DB connection 생성 및 AI Provider 생성"""
+    try:
+        # 데이터베이스 연결 초기화
+        db_manager.constructor()
+        
+        # AI Provider 초기화
+        ai_manager.constructor()
+        
+        logger.info("환경 초기화가 완료되었습니다.")
+        
+    except Exception as e:
+        logger.error(f"환경 초기화 중 오류가 발생했습니다: {e}")
+        raise
+
+
+def check_init_environment(db_manager, args, ai_manager, config):
+        # 데이터베이스 연결 확인
+        if not db_manager.is_connected():
+            logger.error("데이터베이스에 연결할 수 없습니다.")
+            logger.error("환경 변수를 확인하거나 .env 파일을 설정해주세요.")
+            sys.exit(1)
+        
+        logger.info("MySQL Hub Server를 시작합니다.")
+        logger.info(f"실행 모드: {args}")
+        logger.info(f"AI Provider: {ai_manager.get_current_provider()}")
+        logger.info(f"HTTP 서버: http://{config.HTTP_SERVER_HOST}:{config.HTTP_SERVER_PORT}")
+        logger.info(f"log level : {config.LOG_LEVEL}")

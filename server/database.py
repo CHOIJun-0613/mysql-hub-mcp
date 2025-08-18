@@ -20,6 +20,9 @@ class DatabaseManager:
         self.engine = None
         self.session_factory = None
         self.metadata = MetaData()
+    
+    def constructor(self):
+        """데이터베이스 연결을 초기화합니다."""
         self._initialize_connection()
     
     def _initialize_connection(self):
@@ -259,6 +262,25 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"데이터베이스 정보 조회 실패: {e}")
             return {"error": f"데이터베이스 정보 조회 중 오류가 발생했습니다: {e}"}
+
+    def close_connection(self):
+        """데이터베이스 연결을 안전하게 종료합니다."""
+        try:
+            if self.engine:
+                # 모든 연결 풀의 연결을 정리
+                self.engine.dispose()
+                logger.info("데이터베이스 엔진이 정리되었습니다.")
+            
+            if self.session_factory:
+                self.session_factory.close_all()
+                logger.info("세션 팩토리가 정리되었습니다.")
+            
+            self.engine = None
+            self.session_factory = None
+            logger.info("데이터베이스 연결이 완전히 종료되었습니다.")
+            
+        except Exception as e:
+            logger.error(f"데이터베이스 연결 종료 중 오류 발생: {e}")
 
 # 전역 데이터베이스 관리자 인스턴스
 db_manager = DatabaseManager() 

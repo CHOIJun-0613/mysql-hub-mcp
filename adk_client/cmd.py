@@ -63,6 +63,11 @@ async def chat_loop():
 
     print("\n💬 ADK LLM Agent 채팅이 시작되었습니다. 종료하려면 'quit' 또는 ':q'를 입력하세요.\n")
 
+    import uuid
+    global SESSION_ID
+    SESSION_ID = str(uuid.uuid4())
+    print(f"🔍 세션 ID: {SESSION_ID}")
+
     # 앱/사용자/세션 설정으로 ADK MCP 클라이언트 초기화
     client = MCPClient(
         app_name=APP_NAME,
