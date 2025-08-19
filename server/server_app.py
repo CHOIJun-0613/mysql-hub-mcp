@@ -14,7 +14,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from mcp_server import run_mcp_server
 from http_server import run_http_server
-from common import clear_screen
+from common import clear_screen, init_environment
 
 #stdout을 clear하고 시작
 clear_screen()
@@ -32,17 +32,8 @@ class ServerApp:
     async def start_http_server(self):
         """HTTP 서버를 시작합니다."""
         try:
-            import uvicorn
-            from http_server import app
-            
-            uvicorn_config = uvicorn.Config(
-                app,
-                host=config.HTTP_SERVER_HOST,
-                port=config.HTTP_SERVER_PORT,
-                log_level=config.LOG_LEVEL.lower()
-            )
-            server = uvicorn.Server(uvicorn_config)
-            await server.serve()
+
+            await run_http_server()
         except Exception as e:
             logger.error(f"HTTP 서버 시작 실패: {e}")
             raise
@@ -79,10 +70,8 @@ class ServerApp:
         """HTTP 서버만 실행합니다."""
         try:
             logger.info("\n\n🚨===== MySQL Hub HTTP Server 시작 =====\n")
-            logger.info("HTTP 서버만 시작합니다.")
-            # 환경 초기화 (데이터베이스 연결 및 AI Provider 초기화)
-            from common import init_environment
-            init_environment(db_manager, ai_manager)
+            logger.debug("HTTP 서버만 시작합니다.")
+            
             await self.start_http_server()
         except Exception as e:
             logger.error(f"HTTP 서버 실행 중 오류: {e}")
@@ -93,7 +82,9 @@ class ServerApp:
     async def run_mcp_only(self):
         """MCP 서버만 실행합니다."""
         try:
-            logger.info("MCP 서버만 시작합니다.")
+            logger.info("\n\n🚨===== MySQL Hub MCP Server 시작 =====\n")
+            logger.debug("MCP 서버만 시작합니다.")
+            
             await self.start_mcp_server()
         except Exception as e:
             logger.error(f"MCP 서버 실행 중 오류: {e}")
@@ -129,9 +120,7 @@ def main():
     
     try:
         # 로깅 설정
-        config.setup_logging()
-        
-  
+        #config.setup_logging()
         
         # 서버 애플리케이션 생성
         app = ServerApp()

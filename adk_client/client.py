@@ -21,7 +21,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
 # ADK agent와 도구를 빌드하고 관리하기 위한 커스텀 래퍼
-from .agent import AgentWrapper
+from adk_client.agent import AgentWrapper
 
 
 # ------------------------------------------------------------------------------

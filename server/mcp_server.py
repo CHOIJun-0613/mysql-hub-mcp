@@ -17,7 +17,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from ai_worker import natural_language_query_work,make_system_prompt, strip_markdown_sql
 from config import config
-from common import clear_screen
+from common import clear_screen, init_environment
 
 logger = logging.getLogger(__name__)
 host = config.MCP_SERVER_HOST
@@ -163,91 +163,107 @@ async def natural_language_query(question: str) -> Dict[str, Any]:
         logger.error(f"🚨=====[MCP] 자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}
 
-# async def _natural_language_query(question: str):
-#     """자연어 질의를 SQL로 변환하고 SQL 쿼리를 실행합니다. (system prompt에 스키마 정보 포함)."""
-#     try:
-#         # 데이터베이스 스키마 정보 가져오기
-#         db_info = db_manager.get_database_info()
-#         if "error" in db_info:
-#             logger.error(f"데이터베이스 연결 오류: {db_info['error']}")
-#             raise ValueError(f"데이터베이스 연결 오류: {db_info['error']}")
-        
-#         # 현재 tools 지원 모델이 없으므로 기존 방식으로 스키마 정보 수집
-#         schema_info = ""
-#         # devdb 데이터베이스의 실제 테이블들만 사용     
-#         user_tables = [table for table in db_info.get("tables", []) 
-#                       if not table.startswith('INFORMATION_SCHEMA') and 
-#                          not table.startswith('mysql') and 
-#                          not table.startswith('performance_schema') and
-#                          not table.startswith('sys')]
-        
-#         # 모든 사용자 테이블의 스키마 정보를 사용               
-#         for table_name in user_tables:
-#             try:
-#                 schema = db_manager.get_table_schema(table_name)
-#                 schema_info += f"\n\n### {table_name} 테이블 스키마\n"
-#                 schema_info += f"```sql\n{schema}\n```\n"
-#             except Exception as e:      
-#                 logger.error(f"테이블 스키마 조회 실패: {e}")
-#                 continue
-        
-#         # 스키마 정보를 시스템 프롬프트에 포함
-#         system_prompt = make_system_prompt(
-#             database_name=db_info.get("database_name", "devdb"),
-#             schema_info=schema_info,
-#             question=question,
-#             use_tools=False
-#         )
-        
-#         # AI 응답 생성                                  
-#         response = await ai_manager.generate_response(system_prompt)
-#         logger.debug(f"AI 생성 결과 SQL: {response}")
-        
-#         sql_query = response
-        
-#         # SQL 키워드가 포함되어 있는지 확인
-#         sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
-#         if not any(keyword in sql_query.upper() for keyword in sql_keywords):
-#             logger.error(f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}")
-#             return {"error": f"AI가 SQL 쿼리를 생성하지 못했습니다. 응답: {sql_query}", "status": "failed"}    
-
-#         # 마크다운 형식 제거
-#         clean_sql = strip_markdown_sql(sql_query)
-#         logger.info(f"원본 SQL: {sql_query}")
-#         logger.info(f"정리된 SQL: {clean_sql}")
-        
-#         # SQL 쿼리 실행
-#         try:
-#             result = db_manager.execute_query(clean_sql)
-#             return {"data": result, "row_count": len(result), "sql": clean_sql, "status": "success"}
-#         except Exception as e:
-#             logger.error(f"SQL 실행 오류: {e}")
-#             return {"error": f"SQL 실행 오류: {e}", "status": "failed"}  
-
-#     except Exception as e:
-#         logger.error(f"자연어 쿼리 처리 실패: {e}")
-#         return {"error": str(e), "status": "failed"}    
-    
-def run_mcp_server():
+   
+async def run_mcp_server():
     """MCP 서버를 실행합니다."""
     global mcp_server
     
-    # 시그널 핸들러 등록 (Windows 호환성 고려)
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    # Windows가 아닌 경우에만 SIGTERM 등록
-    if hasattr(signal, 'SIGTERM'):
-        signal.signal(signal.SIGTERM, signal_handler)
-    
     # stdout을 clear하고 시작
     #clear_screen()
-    
+    init_environment(db_manager, ai_manager)
     logger.info("MySQL Hub MCP 서버를 시작합니다...")
     logger.info(f"MCP 서버 호스트: {config.MCP_SERVER_HOST}")
     logger.info(f"MCP 서버 포트: {config.MCP_SERVER_PORT}")
     
+    # 종료 이벤트를 위한 asyncio.Event
+    shutdown_event = asyncio.Event()
+    
+    # 시그널 핸들러를 비동기적으로 처리
+    def signal_handler_async():
+        logger.info("🚨=====[MCP] 종료 시그널을 받았습니다. 서버를 안전하게 종료합니다...")
+        shutdown_event.set()
+    
+    # 시그널 핸들러 등록
+    import signal
+    signal.signal(signal.SIGINT, lambda signum, frame: signal_handler_async())
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, lambda signum, frame: signal_handler_async())
+    
     try:
-        mcp.run("streamable-http")
+        # FastMCP의 run() 메서드를 별도 스레드에서 실행
+        import concurrent.futures
+        import threading
+        
+        def run_mcp_in_thread():
+            try:
+                # FastMCP 서버를 실행하되, 종료 시그널을 처리할 수 있도록 설정
+                mcp.run("streamable-http")
+            except KeyboardInterrupt:
+                logger.info("MCP 서버 스레드에서 KeyboardInterrupt를 받았습니다.")
+            except Exception as e:
+                logger.error(f"MCP 서버 스레드에서 오류 발생: {e}")
+        
+        # 스레드 풀에서 MCP 서버 실행
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_mcp_in_thread)
+            
+            # 종료 이벤트 또는 완료 대기
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=None)
+                logger.info("🚨=====[MCP] 종료 시그널을 받았습니다. MCP 서버를 중지합니다...")
+                
+                # future를 취소하여 MCP 서버 스레드 종료
+                future.cancel()
+                try:
+                    # 더 짧은 타임아웃으로 먼저 시도
+                    future.result(timeout=2)
+                    logger.info("MCP 서버 스레드가 취소되었습니다.")
+                except concurrent.futures.CancelledError:
+                    logger.info("MCP 서버 스레드가 취소되었습니다.")
+                except concurrent.futures.TimeoutError:
+                    logger.warning("MCP 서버 스레드 종료 시간 초과, 강제 종료 시도...")
+                    
+                    # 강제 종료를 위해 executor를 종료
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    logger.info("MCP 서버 executor가 강제 종료되었습니다.")
+                    
+                    # MCP_SERVER_PORT를 사용하는 프로세스를 직접 종료
+                    try:
+                        import subprocess
+                        import platform
+                        
+                        if platform.system() == "Windows":
+                            # Windows에서 MCP_SERVER_PORT를 사용하는 프로세스 찾기 및 종료
+                            # netstat으로 포트를 사용하는 PID 찾기
+                            result = subprocess.run(['netstat', '-aon'], capture_output=True, text=True)
+                            lines = result.stdout.split('\n')
+                            
+                            for line in lines:
+                                if f':{config.MCP_SERVER_PORT}' in line and 'LISTENING' in line:
+                                    parts = line.split()
+                                    if len(parts) >= 5:
+                                        pid = parts[-1]
+                                        try:
+                                            # 해당 PID 프로세스 종료
+                                            subprocess.run(['taskkill', '/f', '/pid', pid], capture_output=True)
+                                            logger.info(f"Windows에서 PID {pid} 프로세스 강제 종료 완료")
+                                        except Exception as e:
+                                            logger.error(f"PID {pid} 프로세스 종료 실패: {e}")
+                                        break
+                        else:
+                            # Linux/Mac에서 MCP_SERVER_PORT를 사용하는 프로세스 찾기 및 종료
+                            cmd = f"lsof -ti:{config.MCP_SERVER_PORT} | xargs kill -9"
+                            subprocess.run(cmd, shell=True, capture_output=True)
+                            logger.info(f"Linux/Mac에서 포트 {config.MCP_SERVER_PORT} 프로세스 강제 종료 완료")
+                            
+                    except Exception as e:
+                        logger.error(f"포트 {config.MCP_SERVER_PORT} 프로세스 강제 종료 실패: {e}")
+                        
+            except asyncio.TimeoutError:
+                logger.info("MCP 서버가 정상적으로 완료되었습니다.")
+            except Exception as e:
+                logger.error(f"MCP 서버 실행 중 오류 발생: {e}")
+                
     except KeyboardInterrupt:
         logger.info("🚨=====[MCP] Ctrl+C를 받았습니다. 서버를 종료합니다...")
     except asyncio.exceptions.CancelledError:
@@ -292,7 +308,7 @@ def _cleanup_resources():
 
 if __name__ == "__main__":
     try:
-        run_mcp_server()
+        asyncio.run(run_mcp_server())
     except KeyboardInterrupt:
         logger.info("🚨=====[MCP] 메인 스레드에서 Ctrl+C를 받았습니다.")
         _cleanup_resources()

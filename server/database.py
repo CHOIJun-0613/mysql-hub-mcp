@@ -5,7 +5,7 @@ MySQL 데이터베이스 관리 모듈
 
 import logging
 from typing import List, Dict, Any, Optional
-#import pymysql
+import pymysql
 from sqlalchemy import create_engine, text, MetaData, Table, Column, String, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker

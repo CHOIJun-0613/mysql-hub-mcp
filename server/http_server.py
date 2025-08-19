@@ -17,8 +17,8 @@ import uvicorn
 from config import config
 from database import db_manager
 from ai_provider import ai_manager
-from ai_worker import strip_markdown_sql, natural_language_query_work, make_clear_sql
-from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, check_init_environment
+from ai_worker import strip_markdown_sql, natural_language_query_work
+from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, init_environment
 from common import AIProviderRequest, Response, clear_screen
 
 # stdout clear
@@ -279,37 +279,26 @@ async def switch_ai_provider(request: AIProviderRequest):
         logger.error(f"🚨=====[HTTP] AI Provider 전환 실패: {e}")
         return Response(success=False, error=str(e))
     
-def run_http_server():
+async def run_http_server():
     """HTTP 서버를 실행합니다."""
-    # 시그널 핸들러 등록 (Windows 호환성 고려)
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    # Windows가 아닌 경우에만 SIGTERM 등록
-    if hasattr(signal, 'SIGTERM'):
-        signal.signal(signal.SIGTERM, signal_handler)
-    
-    logger.info(f"🚨=====[HTTP] HTTP 서버를 시작합니다...")
-    logger.info(f"🚨=====[HTTP] 호스트: {config.HTTP_SERVER_HOST} 포트: {config.HTTP_SERVER_PORT}")
-    #check_init_environment(db_manager, "HTTP", ai_manager, config)
+    init_environment(db_manager, ai_manager)
     try:
-        uvicorn.run(
+        uvicorn_config = uvicorn.Config(
             app,
             host=config.HTTP_SERVER_HOST,
             port=config.HTTP_SERVER_PORT,
-            log_level="INFO"
+            log_level=config.LOG_LEVEL.lower()
         )
-    except KeyboardInterrupt:
-        logger.info("Ctrl+C를 받았습니다. HTTP 서버를 종료합니다...")
+        server = uvicorn.Server(uvicorn_config)
+        await server.serve()
     except Exception as e:
-        logger.error(f"HTTP 서버 실행 중 오류 발생: {e}")
-    finally:
-        # 정리 작업 수행
-        _cleanup_resources()
-        logger.info("🚨=====[HTTP] 서버가 완전히 종료되었습니다.")
+        logger.error(f"HTTP 서버 시작 실패: {e}")
+        raise
 
 if __name__ == "__main__":
     try:
-        run_http_server()
+        import asyncio
+        asyncio.run(run_http_server())
         
     except KeyboardInterrupt:
         logger.info("🚨=====[HTTP] 메인 스레드에서 Ctrl+C를 받았습니다.")

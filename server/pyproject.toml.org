@@ -1,12 +1,12 @@
 [project]
-name = "adk-client"
+name = "server"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10, <3.12"
+requires-python = ">=3.10"
 dependencies = [
     "dotenv>=0.9.9",
-    "google-adk>=1.11.0",
-    "litellm>=1.75.8",
-    "rich>=14.1.0",
+    "fastapi>=0.116.1",
+    "pymysql>=1.1.1",
+    "sqlalchemy>=2.0.42",
 ]

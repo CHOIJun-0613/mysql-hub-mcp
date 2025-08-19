@@ -17,7 +17,7 @@ import logging
 from rich import print
 
 # MCPClient 클래스 임포트
-from .client import MCPClient
+from adk_client.client import MCPClient
 
 # ------------------------------------------------------------------------------
 # 설정 상수

@@ -54,10 +54,10 @@ SYSTEM_PROMPT = """
 ## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
 
 ## 🚨 중요 규칙
-- **절대 같은 도구를 반복해서 호출하지 마세요**
 - **한 번에 하나의 도구만 호출하세요**
 - **사용자 질문에 대해 단계별로 진행하세요**
 - **각 단계가 완료되면 다음 단계로 진행하세요**
+- **SQL 작성 시 존재하지 않은 테이블과 컬럼은 사용하지 마세요** 
 - **사용자의 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요**
 
 ## 📋 도구 사용 순서 (반드시 이 순서를 따르세요)
@@ -71,10 +71,11 @@ SYSTEM_PROMPT = """
 
 ### 3단계: SQL 쿼리 작성 및 실행
 4. 스키마 정보를 바탕으로 **직접 SQL 문을 작성**하세요
-5. `execute_sql("SQL문")` - 작성한 SQL 실행
-6. `execute_sql("SQL문")`을 호출했으면 natural_language_query(query)를 호출하지 마세요요 
-6. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
-7. 사용자에게 결과를 표시할 때는 테이블 형태로 표시하세요
+5. SQL문을 작성할 때는 스키마 정보를 기준으로 작성하세요, 스키마 정보에 없는 테이블이나 컬럼을 절대 사용하지 마세요.
+6. `execute_sql("SQL문")` - 작성한 SQL 실행
+7. `execute_sql("SQL문")`을 호출했으면 natural_language_query(query)를 호출하지 마세요요 
+8. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
+9. 사용자에게 결과를 표시할 때는 테이블 형태로 표시하세요
 
 
 ## 🔧 사용 가능한 도구
@@ -148,12 +149,12 @@ class AgentWrapper:
         toolsets = await self._load_toolsets()
 
         # 로드된 도구세트로 ADK LLM Agent 구성
-        self.agent = LlmAgent(
-            model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
-            name="mysql_assistant",
-            instruction=SYSTEM_PROMPT,
-            tools=toolsets
-        )
+        # self.agent = LlmAgent(
+        #     model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
+        #     name="mysql_assistant",
+        #     instruction=SYSTEM_PROMPT,
+        #     tools=toolsets
+        # )
         
         # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
         # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
@@ -161,18 +162,18 @@ class AgentWrapper:
         #llmodel = LiteLlm(model=QWEN_MODEL_NAME)
         
         # LMStudio를 사용하여 qwen/qwen3-8b 모델을 지정합니다.
-        # lmstudio_model = LiteLlm(
-        #     model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
-        #     api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
-        #     api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
-        # )
+        lmstudio_model = LiteLlm(
+            model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
+            api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
+            api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
+        )
         
-        # self.agent = LlmAgent(
-        #     model=llmodel,  # agent를 구동할 모델 선택
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
+        self.agent = LlmAgent(
+            model=lmstudio_model,  # agent를 구동할 모델 선택
+            name="mysql_assistant",
+            instruction=SYSTEM_PROMPT,
+            tools=toolsets
+        )
         
         # 현재 활성화된 모델: LMStudio (OpenAI 호환 API)
         # 다른 모델을 사용하려면 아래 주석 처리된 코드 중 하나를 활성화하고
