@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------------
 
 import asyncio
+import sys
 from rich import print  # 컬러 터미널 로깅을 위해 사용
 
 # ADK의 내장 LLM agent 클래스
@@ -35,7 +36,7 @@ from .utilities import read_config_json
 
 # 모델 이름 설정
 # Google Gemini 모델
-GEMINI_MODEL_NAME = "gemini-2.0-flash"
+GEMINI_MODEL_NAME = "gemini-1.5-flash"
 
 # Ollama 로컬 모델들
 QWEN_MODEL_NAME = "ollama/qwen2.5-coder:latest"
@@ -54,6 +55,7 @@ SYSTEM_PROMPT = """
 ## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
 
 ## 🚨 중요 규칙
+- **동일한 도구를 반복해서 호출하지 마세요**
 - **한 번에 하나의 도구만 호출하세요**
 - **사용자 질문에 대해 단계별로 진행하세요**
 - **각 단계가 완료되면 다음 단계로 진행하세요**
@@ -78,17 +80,18 @@ SYSTEM_PROMPT = """
 3. `execute_sql("SQL문")` - 작성한 SQL 실행
 4. `execute_sql("SQL문")`을 호출했으면 natural_language_query(query)를 호출하지 마세요 
 5. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
-6. 사용자에게 결과를 표시할 때는 테이블 형태로 표시하세요
-7. execute_sql() 도구 사용이 적절하지 않으면 `natural_language_query(query)`도구 사용
-8. SQL문이 정상적으로 생성하지 못한 경우는 `natural_language_query(query)`도구 사용
+6. 사용자에게 SQL 결과를 표시할 때는 테이블 형태로 표시하세요
+7. execute_sql() 도구 사용이 적절하지 않은 경우에만 `natural_language_query(query)`도구 사용
+8. SQL문이 정상적으로 생성하지 못한 경우에만 `natural_language_query(query)`도구 사용
+9. 사용자 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요
 
 
 ## 🔧 사용 가능한 도구
-- `get_database_info()` - 데이터베이스 정보 확인
+- `get_database_info()` - 데이터베이스 정보 확인 (한 번만!)
 - `get_table_list()` - 테이블 목록 확인 (한 번만!)
-- `get_table_schema(table_name)` - 테이블 스키마 확인
-- `execute_sql(sql)` - SQL 실행
-- `natural_language_query(query)` - 복잡한 자연어 질의 (마지막 수단)
+- `get_table_schema(table_name)` - 테이블 스키마 확인(필요시 관련 테이블 수 만큼 호출)
+- `execute_sql(sql)` - SQL 실행(한 번만!)
+- `natural_language_query(query)` - 복잡한 자연어 질의 (필요할 때만 호출)
 
 ## 📝 구체적인 진행 방법
 
@@ -103,18 +106,21 @@ SYSTEM_PROMPT = """
 7. 사용자 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요
 
 ## ❌ 금지사항
-- 같은 도구를 연속으로 호출하지 마세요
+- 같은 도구를 연속으로 반복해서 호출하지 마세요
 - 불필요한 반복을 하지 마세요
 - 한 번에 여러 도구를 동시에 호출하지 마세요
 - `get_database_info()`여러 번 호출하지 마세요
 - `get_table_list()`를 여러 번 호출하지 마세요
+- 같은 테이블에 대해서 get_table_schema(table_name)를 반복해서 호출하지 마세요
 - `execute_sql()` 호출 후 결과를 확인하고 사용자에게 그 결과를 반환하고 끝내세요
 - 'execute_sql()' 호출 후 'natural_language_query()'를 호출하지 마세요
 
 ## ✅ 올바른 응답 패턴
-각 도구 호출 후 결과를 확인하고, 다음 단계로 진행하세요. 모든 정보를 수집한 후 최종 SQL을 작성하고 실행하세요.
-SQL 쿼리 결과는 테이블 형태로 표시하세요
+각 도구 호출 후 결과를 확인하고, 다음 단계로 진행하세요. 
+모든 정보를 수집한 후 최종 SQL을 작성하고 실행하세요.
+SQL 쿼리 결과는 테이블 형태로 표시하세요.
 사용자의 질문에 답변하기 위해 위 순서를 따라 진행하세요.
+사용자의 질문에 답변이 완료되면 다음 질의를 받을때까지 대기하세요.
 """
 
 # ------------------------------------------------------------------------------
@@ -260,3 +266,7 @@ class AgentWrapper:
 
         # 취소 및 정리가 완료되도록 작은 지연
         await asyncio.sleep(1.0)
+
+if sys.platform == 'win32':
+    # Windows에서 더 안정적인 asyncio 설정
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
