@@ -77,11 +77,11 @@ async def get_database_info() -> Dict[str, Any]:
         return {"error": str(e), "status": "failed"}
     
 @mcp.tool(description="테이블 목록을 조회한다.", title="테이블 목록록 조회")
-async def get_table_list() -> List[str]:
+async def get_table_list() -> List[Dict[str, Any]]:
     """테이블 목록을 반환합니다.
     
     Returns:
-        List[str]: 테이블 목록
+        List[Dict[str, Any]]: 테이블 목록[{"table_name": "테이블 이름", "table_comment": "테이블 코멘트"}]
     """
     try:
         tables = db_manager.get_table_list()
@@ -92,7 +92,7 @@ async def get_table_list() -> List[str]:
         return []
 
 @mcp.tool(description="테이블의 Schema 정보를 조회한다.", title="테이블 Schema 조회")
-async def get_table_schema(table_name: str) -> List[Dict[str, Any]]:
+async def get_table_schema(table_name: str) -> Dict[str, Any]:
     """테이블 스키마를 반환합니다.
     
     Args:

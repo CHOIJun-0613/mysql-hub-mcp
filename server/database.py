@@ -142,7 +142,7 @@ class DatabaseManager:
             logger.error(f"쿼리 실행 실패: {e}")
             raise Exception(f"쿼리 실행 중 오류가 발생했습니다: {e}")
     
-    def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
+    def get_table_schema(self, table_name: str) -> Dict[str, Any]:
         """테이블 스키마 정보를 반환합니다."""
         if not self.is_connected():
             raise Exception("데이터베이스에 연결되지 않았습니다.")
@@ -176,6 +176,10 @@ class DatabaseManager:
             ORDER BY ORDINAL_POSITION
             """
             columns = self.execute_query(query)
+            # result가 {"TABLE_NAME": ..., "TABLE_COMMENT": ..., "COLUMNS": [...]} 형태라면
+            # 반환 타입을 Dict[str, Any]로 변경해야 합니다.
+            # 즉, 함수 시그니처를 아래와 같이 수정해야 합니다:
+            # def get_table_schema(self, table_name: str) -> Dict[str, Any]:
 
             # 결과 포맷 맞추기
             result = {

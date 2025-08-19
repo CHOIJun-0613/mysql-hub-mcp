@@ -51,45 +51,88 @@ READ_ONLY_TOOLS = [
 ]
 
 SYSTEM_PROMPT = """
-## 당신은 사용자의 질문에 친절하게 답변하는 AI 비서입니다. 
-- 자연어 질의를 받아서 SQL 쿼리를 작성합니다.
-- SQL 쿼리 작성 시 도구를 사용하여 데이터베이스 정보를 확인하고 직접 SQL 문을 작성합니다.
-- 작성된 SQL 쿼리를 실행하여 도구를 통해서 실행하고 그 결과를 사용자에게 반환합니다.
+## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
 
-## 도구 목록
-- get_database_info() : 데이터베이스 정보 확인
-- get_table_list() : 테이블 목록 확인
-- get_table_schema(table_name) : 관련 테이블의 스키마 정보 확인
-- execute_sql(sql) : 작성한 SQL 직접 실행
-- natural_language_query(query) : 자연어 질의
+## 🚨 중요 규칙
+- **동일한 도구를 반복해서 호출하지 마세요**
+- **한 번에 하나의 도구만 호출하세요**
+- **사용자 질문에 대해 단계별로 진행하세요**
+- **각 단계가 완료되면 다음 단계로 진행하세요**
+- **SQL 작성 시 존재하지 않은 테이블과 컬럼은 사용하지 마세요** 
+- **사용자의 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요**
 
-## 1단계: MCP 서버와 직접 소통하여 직접 SQL 작성 (권장)
-- 다음 순서로 진행: 도구 사용 순서
-  1. `get_database_info()` : 데이터베이스 정보 확인
-  2. `get_table_list()` : 테이블 목록 확인
-  3. `get_table_schema(table_name)` : 관련 테이블의 스키마 정보 확인
-  4. 스키마 정보를 바탕으로 직접 SQL 문 작성, 마크다운 형식은 제외한 순수한 SQL 문만 1개만 작성합니다.
-  5. `execute_sql(sql)` : 작성한 SQL 직접 실행
+## 📋 도구 사용 순서 (반드시 이 순서를 따르세요)
 
-## 2단계: 자연어 쿼리 (대안)
-- 위 방법으로 SQL을 작성할 수 없는 경우에만 도구의 `natural_language_query()` 호출
-- 복잡한 쿼리나 스키마 정보만으로는 SQL 작성이 어려운 경우
+### 1단계: 데이터베이스 구조 파악
+1. `get_table_list()` - 전체 테이블 목록 확인 (한 번만 호출)
+2. 사용자 질의를 분석해서 관련 테이블을 추론한다.
 
-## 사용 예시
+### 2단계: 관련 테이블 스키마 확인 및 SQL 쿼리 작성
+1. `get_table_schema("table_name")` - 사용자 질문과 관련된 테이블의 스키마 확인
+-** 관련된 테이블에서 필요하다고 판단하는 테이블들에 대해 `get_table_schema("table_name")` 호출**
+2. 스키마 정보를 바탕으로 **직접 SQL 문을 작성**하세요
+3. SQL문을 작성할 때는 스키마 정보를 기준으로 작성하세요, 
+4. 테이블 리스트에 없는 테이블이나 스키마 정보에 없는 컬럼을 절대 사용하지 마세요.
 
-**올바른 방법: MCP tool(도구) 사용 순서
- 1. get_database_info() → 데이터베이스 정보 확인
- 2. get_table_list() → 테이블 목록 확인
- 2. get_table_schema("users") → users 테이블 스키마 확인
- 3. execute_sql("SELECT * FROM users") → 직접 SQL 실행
+### 3단계: SQL 쿼리 작성 및 실행
+4. `execute_sql("SQL문")` - 작성한 SQL 실행
+4. `execute_sql("SQL문")`을 호출했으면 natural_language_query(query)를 호출하지 마세요 
+5. `execute_sql("SQL문")`을 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
+6. `execute_sql("SQL문")`을 호출 결과를 표시할 때는 테이블 형태로 표시하세요
+** 주의: 
+- SQL문이 정상적으로 작성하지 못한 경우에만 `natural_language_query(query)`도구 사용
+- execute_sql() 도구 사용이 적절하지 않은 경우에만 `natural_language_query(query)`도구 사용
 
-**대안 방법: 자연어 질의
-- MCP tool 'natural_language_query'("사용자 정보를 복잡한 조건으로 조회해줘")
+### 4단계: 결과 확인 및 사용자 질의 답변
+7. 사용자 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요
 
+
+
+## 🔧 사용 가능한 도구
+- `get_table_list()` - 테이블 목록 확인 (한 번만!)
+- `get_table_schema(table_name)` - 테이블 스키마 확인(필요시 관련 테이블 수 만큼 호출)
+- `execute_sql(sql)` - SQL 실행(한 번만!)
+- `natural_language_query(query)` - 복잡한 자연어 질의 (필요할 때만 호출)
+
+## 📝 구체적인 진행 방법
+
+**사용자 질문: "사용자 목록 검색"**
+
+1. 그 다음 `get_table_list()` 호출 (한 번만!)
+2. 테이블 목록에서 "users" 테이블을 찾음
+3. `get_table_schema("users")` 호출
+4. 스키마 정보를 보고 `execute_sql("SELECT * FROM users")` 호출
+5. SQL 호출 결과를 확인하고 사용자에게 SQL문과 그 결과를 반환
+6. 사용자 질의에 답변이 완료되면 다음 질의를 받을때까지 대기하세요
+
+## ❌ 금지사항
+- 같은 도구를 연속으로 반복해서 호출하지 마세요
+- 불필요한 반복을 하지 마세요
+- 한 번에 여러 도구를 동시에 호출하지 마세요
+- `get_table_list()`를 여러 번 호출하지 마세요
+- 같은 테이블에 대해서 `get_table_schema(table_name)`를 반복해서 호출하지 마세요
+- `execute_sql()` 호출 후 결과를 확인하고 사용자에게 그 결과를 반환하고 끝내세요
+- 'execute_sql()' 호출 후 'natural_language_query()'를 호출하지 마세요
+
+## ✅ 올바른 응답 패턴
+각 도구 호출 후 결과를 확인하고, 다음 단계로 진행하세요. 
+모든 정보를 수집한 후 최종 SQL을 작성하고 실행하세요.
+SQL 쿼리 결과는 테이블 형태로 표시하세요.
+사용자의 질문에 답변하기 위해 위 순서를 따라 진행하세요.
+사용자의 질문에 답변이 완료되면 다음 질의를 받을때까지 대기하세요.
 """
 # 환경 변수 로드
 load_dotenv()
+# 모델 이름 설정
+# Google Gemini 모델
+GEMINI_MODEL_NAME = "gemini-1.5-flash"
 
+# Ollama 로컬 모델들
+QWEN_MODEL_NAME = "ollama/qwen2.5-coder:latest"
+LLAMA_MODEL_NAME = "ollama/llama3.1:8b"
+
+# LMStudio 로컬 모델 (localhost:1234에서 실행)
+LMSTUDIO_QWEN_MODEL_NAME = "lm_studio/qwen/qwen3-8b"  # LMStudio에서 사용할 모델명
 # ------------------------------------------------------------------------------
 # 클래스: AgentWrapper
 # ------------------------------------------------------------------------------
@@ -126,28 +169,36 @@ class AgentWrapper:
         """
         toolsets = self._load_toolsets()
 
-        #로드된 도구세트로 ADK LLM Agent 구성
+        # 로드된 도구세트로 ADK LLM Agent 구성
+        # self.agent = LlmAgent(
+        #     model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
+        #     name="mysql_assistant",
+        #     instruction=SYSTEM_PROMPT,
+        #     tools=toolsets
+        # )
+        
+        # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
+        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
+        #local_llama_model = LiteLlm(model=LLAMA_MODEL_NAME)
+        #llmodel = LiteLlm(model=QWEN_MODEL_NAME)
+        
+        # LMStudio를 사용하여 qwen/qwen3-8b 모델을 지정합니다.
+        lmstudio_model = LiteLlm(
+            model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
+            api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
+            api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
+        )
+        
         self.agent = LlmAgent(
-            model="gemini-2.0-flash",  # agent를 구동할 모델 선택
+            model=lmstudio_model,  # agent를 구동할 모델 선택
             name="mysql_assistant",
             instruction=SYSTEM_PROMPT,
             tools=toolsets
         )
         
-       # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
-        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
-        # local_llama_model = LiteLlm(model="ollama/llama3.1:8b")
         
-        # self.agent = LlmAgent(
-        #     model=local_llama_model,  # agent를 구동할 모델 선택
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장
-        # =생성한 에이전트 객체를 반드시 'root_agent' 라는 이름의 변수에 할당합니다.
-        # ADK는 이 변수 이름을 기준으로 에이전트를 찾습니다.
-        #self.root_agent = self.agent
+
 
     def _load_toolsets(self):
         """
