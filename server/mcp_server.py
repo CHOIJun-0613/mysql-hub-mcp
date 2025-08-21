@@ -17,7 +17,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from ai_worker import natural_language_query_work,make_system_prompt, strip_markdown_sql
 from config import config
-from common import clear_screen, init_environment
+from common import clear_screen, init_environment, json_to_pretty_string, convert_decimal_in_result
 
 logger = logging.getLogger(__name__)
 host = config.MCP_SERVER_HOST
@@ -35,7 +35,7 @@ mcp = FastMCP(
     message_path= "/messages/",
     streamable_http_path= "/mcp",
     stateless_http=True,
-    log_level="INFO"
+    log_level="WARNING"
 )
 
 def signal_handler(signum, frame):
@@ -70,7 +70,9 @@ async def get_database_info() -> Dict[str, Any]:
     """
     try:
         info = db_manager.get_database_info()
-        logger.info(f"🚨=====[MCP] 데이터베이스 정보 조회 결과:\n{info}\n")
+        # info를 정렬된 json 형태로 출력
+        import json
+        logger.info(f"🚨=====[MCP] 데이터베이스 정보 조회 결과:\n{json_to_pretty_string(info)}\n")
         return info
     except Exception as e:
         logger.error(f"🚨=====[MCP] 데이터베이스 정보 조회 실패: {e}")
@@ -85,7 +87,7 @@ async def get_table_list() -> List[Dict[str, Any]]:
     """
     try:
         tables = db_manager.get_table_list()
-        logger.info(f"🚨=====[MCP] 테이블 목록 조회 결과: \n{tables}\n")
+        logger.info(f"🚨=====[MCP] 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
         return tables
     except Exception as e:
         logger.error(f"🚨=====[MCP] 테이블 목록 조회 실패: {e}")
@@ -106,7 +108,7 @@ async def get_table_schema(table_name: str) -> Dict[str, Any]:
             raise ValueError("테이블 이름이 제공되지 않았습니다.")
         
         schema = db_manager.get_table_schema(table_name)
-        logger.info(f"🚨=====[MCP] 테이블 스키마 조회 결과: \n{schema}\n")
+        logger.info(f"🚨=====[MCP] 테이블 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
         return schema
     except Exception as e:
         logger.error(f"🚨=====[MCP] 테이블 스키마 조회 실패: {e}")
@@ -129,8 +131,13 @@ async def execute_sql(sql: str) -> Dict[str, Any]:
         # 데이터베이스 매니저에서 SQL 실행 메서드 호출
         result = db_manager.execute_query(sql)
         
-        result = {"data": result, "row_count": len(result), "sql": sql, "status": "success"}
-        logger.info(f"🚨=====[MCP] SQL 실행 결과: \n{result}\n")
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        
+        # 결과 데이터에서 Decimal 타입 변환
+        converted_result = convert_decimal_in_result(result)
+        
+        result = {"data": converted_result, "row_count": len(converted_result), "sql": sql, "status": "success"}
+        logger.info(f"🚨=====[MCP] SQL 실행 결과: \n{json_to_pretty_string(result)}\n")
         return result
     except Exception as e:
         logger.error(f"🚨=====[MCP] SQL 실행 실패: {e}")
@@ -155,10 +162,15 @@ async def natural_language_query(question: str) -> Dict[str, Any]:
 
         response = await natural_language_query_work(question, False)
         
-        result = {"data": response.data, "row_count": len(response.data), "sql": response.data.get("sql_query", ""), "status": "success"}
-        logger.info(f"🚨=====[MCP] 자연어 쿼리 처리 결과 완료: \n{result}\n")
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
         
-        return  result
+        # 응답 데이터에서 Decimal 타입 변환
+        converted_data = convert_decimal_in_result(response.data)
+        
+        result = {"data": converted_data, "row_count": len(converted_data), "sql": converted_data.get("sql_query", ""), "status": "success"}
+        logger.info(f"🚨=====[MCP] 자연어 쿼리 처리 결과 완료: \n{json_to_pretty_string(result)}\n")
+        
+        return result
     except Exception as e:
         logger.error(f"🚨=====[MCP] 자연어 쿼리 처리 실패: {e}")
         return {"error": str(e), "status": "failed"}

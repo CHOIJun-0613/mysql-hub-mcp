@@ -98,12 +98,16 @@ class DatabaseManager:
             raise Exception(f"쿼리 실행 중 오류가 발생했습니다: {e}")
     
     def _clean_value(self, value):
-        """데이터베이스 값에서 UTF-8 인코딩 문제를 해결합니다."""
+        """데이터베이스 값에서 UTF-8 인코딩 문제와 Decimal 타입을 해결합니다."""
         if value is None:
             return None
         
         try:
-            if isinstance(value, bytes):
+            # Decimal 타입을 float로 변환
+            from decimal import Decimal
+            if isinstance(value, Decimal):
+                return float(value)
+            elif isinstance(value, bytes):
                 # 바이너리 데이터를 16진수 문자열로 변환
                 return value.hex()
             elif isinstance(value, str):

@@ -12,6 +12,8 @@
 # ------------------------------------------------------------------------------
 
 # Google ADK 콘텐츠/메시지 유형
+import logging
+import warnings
 from google.genai.types import Content, Part
 
 # Runner는 ADK의 인프라를 사용하여 agent로 작업을 실행합니다
@@ -19,11 +21,23 @@ from google.adk.runners import Runner
 
 # 메모리 내 세션 서비스는 세션 데이터를 로컬에 저장합니다
 from google.adk.sessions import InMemorySessionService
+# Google ADK의 실험적 기능 경고 숨기기
+warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*Field name.*shadows an attribute.*", category=UserWarning)
 
 # ADK agent와 도구를 빌드하고 관리하기 위한 커스텀 래퍼
-from adk_client.agent import AgentWrapper
+try:
+    from adk_client.agent import AgentWrapper
+except ImportError:
+    # 상대 import 시도
+    try:
+        from .agent import AgentWrapper
+    except ImportError:
+        # 절대 경로 import 시도
+        from agent import AgentWrapper
 
-
+logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
 # ------------------------------------------------------------------------------
 # 클래스: MCPClient
 # ------------------------------------------------------------------------------
@@ -55,6 +69,8 @@ class MCPClient:
 
         # 메모리 내 세션 서비스 사용 (메모리에 저장, 지속적이지 않음)
         self.session_service = InMemorySessionService()
+
+
 
         # 선택적 도구 필터링으로 agent 래퍼 준비
         # 도구 필터링은 이 클라이언트가 사용할 수 있는 도구를 제한합니다
@@ -103,7 +119,7 @@ class MCPClient:
 
         # 사용자 입력을 role="user"인 Content 객체로 래핑
         new_message = Content(role="user", parts=[Part(text=user_input)])
-
+        
         # agent runner를 통해 메시지를 비동기적으로 실행
         return self.runner.run_async(
             user_id=self.user_id,

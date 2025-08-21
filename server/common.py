@@ -71,9 +71,14 @@ class Response(BaseModel):
 def clear_screen():
     """화면을 지우는 함수"""
     if os.name == 'nt':
-        os.system('cls')
+        # Windows 환경이지만 Git Bash 등에서는 'clear'를 사용해야 함
+        if 'MSYSTEM' in os.environ or 'MINGW64' in os.environ or 'MINGW32' in os.environ:
+            os.system('clear')
+        else:
+            os.system('cls')
     else:
         os.system('clear')
+        
 def init_environment(db_manager, ai_manager):
     """어플리케이션 실행될 수 있도록 DB connection 생성 및 AI Provider 생성"""
     try:
@@ -90,6 +95,23 @@ def init_environment(db_manager, ai_manager):
         raise
 
 
+def convert_decimal_in_result(obj):
+    """결과 데이터에서 Decimal 타입을 float로, date 타입을 문자열로 변환"""
+    from decimal import Decimal
+    import datetime
+    
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: convert_decimal_in_result(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimal_in_result(item) for item in obj]
+    else:
+        return obj
+
+
 def check_init_environment(db_manager, args, ai_manager, config):
         # 데이터베이스 연결 확인
         if not db_manager.is_connected():
@@ -102,3 +124,36 @@ def check_init_environment(db_manager, args, ai_manager, config):
         logger.info(f"AI Provider: {ai_manager.get_current_provider()}")
         logger.info(f"HTTP 서버: http://{config.HTTP_SERVER_HOST}:{config.HTTP_SERVER_PORT}")
         logger.info(f"log level : {config.LOG_LEVEL}")
+
+# json을 입력받아 json format에 맞게 string으로 변환해서 리턴하는 함수
+def json_to_pretty_string(data):
+    """
+    json 객체를 예쁘게 포맷된 문자열로 변환하여 반환합니다.
+
+    Args:
+        data (dict or list): JSON 객체
+
+    Returns:
+        str: 예쁘게 포맷된 JSON 문자열
+    """
+    try:
+        import json
+        from decimal import Decimal
+        
+        def convert_decimal(obj):
+            """Decimal 타입을 float로 변환하는 헬퍼 함수"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal(item) for item in obj]
+            else:
+                return obj
+        
+        # Decimal 타입을 float로 변환
+        converted_data = convert_decimal(data)
+        
+        return json.dumps(converted_data, ensure_ascii=False, indent=2, sort_keys=True)
+    except Exception as e:
+        return f"JSON 변환 오류: {e}"

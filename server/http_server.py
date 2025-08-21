@@ -139,8 +139,26 @@ async def get_database_info():
     """데이터베이스 정보를 반환합니다."""
     try:
         info = db_manager.get_database_info()
-        logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{info}\n")
-        return Response(success=True, data=info)
+        
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        from decimal import Decimal
+        
+        def convert_decimal_in_info(obj):
+            """정보 데이터에서 Decimal 타입을 float로 변환"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_in_info(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal_in_info(item) for item in obj]
+            else:
+                return obj
+        
+        # 정보 데이터에서 Decimal 타입 변환
+        converted_info = convert_decimal_in_info(info)
+        
+        logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{converted_info}\n")
+        return Response(success=True, data=converted_info)
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 데이터베이스 정보 조회 실패: {e}")
         return Response(success=False, error=str(e))
@@ -186,8 +204,25 @@ async def execute_sql(request: SQLQueryRequest):
             affected_rows = db_manager.execute_non_query(clean_query)
             result = {"affected_rows": affected_rows}
         
-        logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{result}\n")
-        return Response(success=True, data=result)
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        from decimal import Decimal
+        
+        def convert_decimal_in_result(obj):
+            """결과 데이터에서 Decimal 타입을 float로 변환"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_in_result(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal_in_result(item) for item in obj]
+            else:
+                return obj
+        
+        # 결과 데이터에서 Decimal 타입 변환
+        converted_result = convert_decimal_in_result(result)
+        
+        logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{converted_result}\n")
+        return Response(success=True, data=converted_result)
         
     except HTTPException:
         raise
@@ -207,8 +242,25 @@ async def natural_language_query(request: NaturalLanguageRequest):
         
         response = await natural_language_query_work(request.question, config.USE_LLM_TOOLS)
 
-        logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{response}\n")
-        return Response(success=True, data=response)
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        from decimal import Decimal
+        
+        def convert_decimal_in_response(obj):
+            """응답 데이터에서 Decimal 타입을 float로 변환"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_in_response(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal_in_response(item) for item in obj]
+            else:
+                return obj
+        
+        # 응답 데이터에서 Decimal 타입 변환
+        converted_response = convert_decimal_in_response(response)
+
+        logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{converted_response}\n")
+        return Response(success=True, data=converted_response)
             
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 자연어 쿼리 처리 중 오류: {e}")
@@ -222,8 +274,26 @@ async def get_table_list():
     """테이블 목록을 반환합니다."""
     try:
         tables = db_manager.get_table_list()
-        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{tables}\n")
-        return Response(success=True, data=tables)
+        
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        from decimal import Decimal
+        
+        def convert_decimal_in_tables(obj):
+            """테이블 목록 데이터에서 Decimal 타입을 float로 변환"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_in_tables(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal_in_tables(item) for item in obj]
+            else:
+                return obj
+        
+        # 테이블 목록 데이터에서 Decimal 타입 변환
+        converted_tables = convert_decimal_in_tables(tables)
+        
+        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{converted_tables}\n")
+        return Response(success=True, data=converted_tables)
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 테이블 목록 조회 실패: {e}")
         return Response(success=False, error=str(e))
@@ -236,8 +306,26 @@ async def get_table_schema(request: TableSchemaRequest):
             raise HTTPException(status_code=400, detail="테이블 이름이 제공되지 않았습니다.")
         
         schema = db_manager.get_table_schema(request.table_name)
-        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{schema}\n")
-        return Response(success=True, data=schema)
+        
+        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
+        from decimal import Decimal
+        
+        def convert_decimal_in_schema(obj):
+            """스키마 데이터에서 Decimal 타입을 float로 변환"""
+            if isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal_in_schema(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal_in_schema(item) for item in obj]
+            else:
+                return obj
+        
+        # 스키마 데이터에서 Decimal 타입 변환
+        converted_schema = convert_decimal_in_schema(schema)
+        
+        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{converted_schema}\n")
+        return Response(success=True, data=converted_schema)
         
     except HTTPException:
         raise

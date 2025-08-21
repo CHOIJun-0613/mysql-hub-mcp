@@ -25,7 +25,18 @@ from google.adk.tools.mcp_tool import StdioConnectionParams
 from google.adk.models.lite_llm import LiteLlm
 
 # config.json 파일을 읽기 위한 유틸리티 함수
-from .utilities import read_config_json
+try:
+    from utilities import read_config_json
+except ImportError:
+    # 상대 import 시도
+    try:
+        from .utilities import read_config_json
+    except ImportError:
+        # 절대 경로 import 시도
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from utilities import read_config_json
 
 # ------------------------------------------------------------------------------
 # 설정 상수
@@ -283,7 +294,23 @@ class AgentWrapper:
             try:
                 # 연결 방법 결정
                 if server.get("type") == "http":
-                    conn = StreamableHTTPServerParams(url=server["url"])
+                    # HTTP 연결 시 인증 설정을 headers로 처리
+                    headers = None
+                    if server.get("auth"):
+                        auth = server["auth"]
+                        if auth.get("scheme") == "bearer" and auth.get("token"):
+                            headers = {"Authorization": f"Bearer {auth['token']}"}
+                        elif auth.get("scheme") == "basic" and auth.get("username") and auth.get("password"):
+                            import base64
+                            credentials = base64.b64encode(f"{auth['username']}:{auth['password']}".encode()).decode()
+                            headers = {"Authorization": f"Basic {credentials}"}
+                        elif auth.get("scheme") == "header" and auth.get("token"):
+                            headers = {auth.get("header_name", "X-API-Key"): auth["token"]}
+                    
+                    conn = StreamableHTTPServerParams(
+                        url=server["url"],
+                        headers=headers
+                    )
 
                 elif server.get("type") == "stdio":
                     # StdioConnectionParams 사용법이 변경되었을 수 있음
