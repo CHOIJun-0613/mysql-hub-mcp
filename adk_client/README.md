@@ -5,6 +5,7 @@ MySQL Hub MCP를 위한 Google ADK 기반 AI Agent입니다. 이 agent는 MCP(Mo
 ## 🚀 주요 기능
 
 - **Google ADK 기반**: Google의 최신 AI 개발 키트를 사용하여 강력한 LLM Agent 구축
+- **다중 AI Provider 지원**: Google Gemini, Groq, LM Studio 중 선택하여 사용
 - **MCP 서버 지원**: HTTP 및 STDIO 연결을 통한 MCP 서버 통신
 - **도구 필터링**: 보안을 위한 선택적 도구 접근 제어
 - **비동기 처리**: asyncio를 사용한 효율적인 비동기 작업 처리
@@ -13,14 +14,16 @@ MySQL Hub MCP를 위한 Google ADK 기반 AI Agent입니다. 이 agent는 MCP(Mo
 ## 📁 프로젝트 구조
 
 ```
-agent/
-├── agent.py          # AgentWrapper 클래스 - ADK agent 및 MCP 도구 관리
-├── client.py         # MCPClient 클래스 - UI/채팅 인터페이스 연결
-├── cmd.py            # 명령줄 채팅 클라이언트 진입점
-├── utilities.py      # 설정 파일 읽기 및 JSON 출력 유틸리티
+adk_client/
+├── agent.py              # AgentWrapper 클래스 - ADK agent 및 MCP 도구 관리
+├── client.py             # MCPClient 클래스 - UI/채팅 인터페이스 연결
+├── cmd.py                # 명령줄 채팅 클라이언트 진입점
+├── ai_config.py          # AI Provider 설정 관리
+├── ai_providers.py       # AI Provider별 LLM 클래스들
+├── utilities.py          # 설정 파일 읽기 및 JSON 출력 유틸리티
 ├── mcp_server_config.json  # MCP 서버 연결 설정
-├── pyproject.toml    # 프로젝트 의존성 및 빌드 설정
-└── README.md         # 이 파일
+├── pyproject.toml        # 프로젝트 의존성 및 빌드 설정
+└── README.md             # 이 파일
 ```
 
 ## 🛠️ 설치 및 설정
@@ -43,11 +46,20 @@ pip install -e .
 `.env` 파일을 생성하고 다음을 추가하세요:
 
 ```env
-# MCP 설정 파일 경로 (선택사항)
-MCP_CONFIG_PATH=/path/to/your/mcp_config.json
+# AI Provider 설정 (google, groq, lmstudio 중 선택)
+AI_PROVIDER=google
 
-# Google ADK API 키 (필요한 경우)
+# Google Gemini 설정
 GOOGLE_API_KEY=your_api_key_here
+GEMINI_MODEL_NAME=gemini-1.5-flash
+
+# Groq 설정
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL_NAME=qwen/qwen3-32b
+
+# LM Studio 설정
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_QWEN_MODEL_NAME=lm_studio/qwen/qwen3-8b
 ```
 
 ### 3. MCP 서버 설정
@@ -67,10 +79,35 @@ GOOGLE_API_KEY=your_api_key_here
 
 ## 🚀 사용 방법
 
+### AI Provider 설정
+
+ADK 클라이언트는 다음 AI Provider를 지원합니다:
+
+#### 1. Google Gemini (기본)
+```env
+AI_PROVIDER=google
+GOOGLE_API_KEY=your_api_key_here
+GEMINI_MODEL_NAME=gemini-1.5-flash
+```
+
+#### 2. Groq
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL_NAME=qwen/qwen3-32b
+```
+
+#### 3. LM Studio
+```env
+AI_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://localhost:1234/v1
+LMSTUDIO_QWEN_MODEL_NAME=lm_studio/qwen/qwen3-8b
+```
+
 ### 명령줄 채팅 클라이언트 실행
 
 ```bash
-python -m agent.cmd
+python cmd.py
 ```
 
 ### 프로그래밍 방식으로 사용

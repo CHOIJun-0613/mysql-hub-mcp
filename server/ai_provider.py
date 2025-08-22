@@ -427,11 +427,24 @@ class AIProviderManager:
             "lmstudio": LMStudioProvider()
         }
         self.current_provider = config.AI_PROVIDER.lower()
+        # 초기화 시 자동으로 constructor 호출
+        self.constructor()
     
     def constructor(self):
         """AI Provider들을 초기화합니다."""
-        # 현재 Provider가 사용 불가능한 경우 다른 Provider로 자동 전환
-        if not self.providers[self.current_provider].is_available():
+        # 현재 설정된 Provider 초기화
+        current_provider = self.providers.get(self.current_provider)
+        if current_provider:
+            # Provider의 constructor 메서드 호출하여 클라이언트 초기화
+            current_provider.constructor()
+            
+            if not current_provider.is_available():
+                logger.warning(f"현재 설정된 AI Provider '{self.current_provider}'가 사용 불가능합니다.")
+                self._switch_to_available_provider()
+            else:
+                logger.info(f"AI Provider '{self.current_provider}'가 성공적으로 초기화되었습니다.")
+        else:
+            logger.error(f"알 수 없는 AI Provider: {self.current_provider}")
             self._switch_to_available_provider()
     
     def _switch_to_available_provider(self):

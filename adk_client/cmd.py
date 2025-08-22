@@ -20,7 +20,7 @@ from rich import print
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*Field name.*shadows an attribute.*", category=UserWarning)
-
+logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
 # MCPClient 클래스 임포트
 try:
     from adk_client.client import MCPClient
@@ -32,7 +32,7 @@ except ImportError:
         # 절대 경로 import 시도
         from client import MCPClient
 
-logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
+
 
 # ------------------------------------------------------------------------------
 # 설정 상수
@@ -78,6 +78,16 @@ async def chat_loop():
 
     print("\n💬 ADK LLM Agent 채팅이 시작되었습니다. 종료하려면 'quit' 또는 ':q'를 입력하세요.\n")
 
+    # AI Provider 정보 표시
+    try:
+        from ai_config import ai_config
+        provider_info = ai_config.get_provider_info()
+        print(f"🤖 AI Provider: {provider_info['provider']}")
+        print(f"📱 모델: {provider_info['model']}")
+        print(f"✅ 상태: {'사용 가능' if provider_info['available'] else '사용 불가능'}")
+    except ImportError:
+        print("⚠️ AI Provider 정보를 불러올 수 없습니다.")
+
     import uuid
     global SESSION_ID
     SESSION_ID = str(uuid.uuid4())
@@ -92,7 +102,13 @@ async def chat_loop():
     )
 
     # 도구세트와 세션 설정 (MCP 도구 서버와 협상)
-    await client.init_session()
+    try:
+        await client.init_session()
+    except Exception as e:
+        print(f"[bold red]⚠️ MCP 서버 연결 실패: {e}[/bold red]")
+        print("[bold yellow]MCP 서버가 실행 중인지 확인해주세요.[/bold yellow]")
+        print("[bold blue]새 터미널에서 'cd server && python run_server.py'를 실행하세요.[/bold blue]")
+        return
 
     try:
         # 사용자 입력을 받고 agent 응답을 처리하는 연속 루프
@@ -118,8 +134,10 @@ async def chat_loop():
                     # func_name 외에 function argument도 출력하는 부분 추가
                     for func_call in function_calls:
                         func_name = getattr(func_call, "name", "알수없음")
-                        # arguments 속성은 dict 또는 None일 수 있음
-                        func_args = getattr(func_call, "arguments", None)
+                        
+                        # args 속성은 dict 또는 None일 수 있음
+                        func_args = getattr(func_call, "args", None)
+                        
                         if func_args:
                             # dict라면 key=value 형태로 출력
                             if isinstance(func_args, dict):
@@ -136,7 +154,7 @@ async def chat_loop():
                     if function_responses:
                         for func_response in function_responses:
                             func_name = getattr(func_response, "name", "알수없음")
-                            func_args = getattr(func_response, "arguments", None)
+                            func_args = getattr(func_response, "args", None)
                             if func_args:
                                 if isinstance(func_args, dict):
                                     args_str = ", ".join(f"{k}={v!r}" for k, v in func_args.items())
@@ -151,7 +169,12 @@ async def chat_loop():
                     break
     finally:
         # 세션이 종료되고 리소스가 해제되도록 보장
-        await client.shutdown()
+        try:
+            await client.shutdown()
+        except Exception as e:
+            print(f"[yellow]⚠️ 클라이언트 종료 중 오류: {e}[/yellow]")
+            # 강제 종료를 위한 짧은 대기
+            await asyncio.sleep(0.1)
 
 # ------------------------------------------------------------------------------
 # 진입점
@@ -167,3 +190,12 @@ if __name__ == '__main__':
         # 나타날 수 있습니다 (데모/교육용 코드에서는 무시해도 안전)
         print("\n⚠️ 종료 중 CancelledError 억제됨 "
         "(데모/교육용 코드에서는 무시해도 안전).")
+    except RuntimeError as e:
+        if "cancel scope" in str(e).lower():
+            print("\n⚠️ MCP 클라이언트 종료 중 cancel scope 오류 발생")
+            print("이는 정상적인 종료 과정에서 발생할 수 있습니다.")
+        else:
+            raise
+    except Exception as e:
+        print(f"\n[bold red]❌ 예상치 못한 오류 발생: {e}[/bold red]")
+        print("[bold yellow]MCP 서버 상태를 확인해주세요.[/bold yellow]")

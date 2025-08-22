@@ -54,22 +54,19 @@ except ImportError:
         
 logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
 
-# 모델 이름 설정
-# Google Gemini 모델
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
-
-# Ollama 로컬 모델들
-QWEN_MODEL_NAME = "ollama/qwen2.5-coder:latest"
-LLAMA_MODEL_NAME = "ollama/llama3.1:8b"
-
-# LMStudio 로컬 모델 (localhost:1234에서 실행)
-# LMStudio 사용 방법:
-# 1. LMStudio를 다운로드하고 설치: https://lmstudio.ai/
-# 2. LMStudio에서 qwen/qwen3-8b 모델을 다운로드
-# 3. LMStudio를 실행하고 모델을 로드
-# 4. API 서버를 시작 (기본 포트: 1234)
-# LMStudio는 OpenAI 호환 API를 제공하므로 'gpt-3.5-turbo'와 같은 모델명을 사용합니다.
-LMSTUDIO_QWEN_MODEL_NAME = "lm_studio/qwen/qwen3-8b"  # LMStudio에서 사용할 모델명
+# AI Provider 설정을 위한 import
+try:
+    from ai_providers import ai_provider_manager
+except ImportError:
+    # 상대 import 시도
+    try:
+        from .ai_providers import ai_provider_manager
+    except ImportError:
+        # 절대 경로 import 시도
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from ai_providers import ai_provider_manager
 
 SYSTEM_PROMPT_SHORT = """
 ## 당신은 MySQL 데이터베이스 전문가 AI 비서입니다.
@@ -282,44 +279,32 @@ class AgentWrapper:
         """
         toolsets = await self._load_toolsets()
 
-        # 로드된 도구세트로 ADK LLM Agent 구성
-        # self.agent = LlmAgent(
-        #     model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
+        # AI Provider Manager를 사용하여 현재 설정된 Provider에 맞는 LLM 생성
+        try:
+            llm = ai_provider_manager.create_llm()
+            provider_info = ai_provider_manager.get_provider_info()
+            print(f"\n[bold blue]🤖 AI Provider: {provider_info['provider']}[/bold blue]")
+            print(f"[bold blue]📱 모델: {provider_info['model']}[/bold blue]")
+            
+            # 로드된 도구세트로 ADK LLM Agent 구성
+            self.agent = LlmAgent(
+                model=llm,  # AI Provider Manager에서 생성한 LLM 사용
+                name="mysql_assistant",
+                instruction=ENG_SYSTEM_PROMPT,
+                tools=toolsets
+            )
+        except Exception as e:
+            print(f"[bold red]⚠️ AI Provider 초기화 실패: {e}[/bold red]")
+            print("[bold yellow]Google Gemini로 폴백합니다.[/bold yellow]")
+            
+            # 폴백: Google Gemini 사용
+            self.agent = LlmAgent(
+                model="gemini-1.5-flash",  # 기본 Google Gemini 모델
+                name="mysql_assistant",
+                instruction=ENG_SYSTEM_PROMPT,
+                tools=toolsets
+            )
         
-        # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
-        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
-        #local_llama_model = LiteLlm(model=LLAMA_MODEL_NAME)
-        #llmodel = LiteLlm(model=QWEN_MODEL_NAME)
-        
-        # LMStudio를 사용하여 qwen/qwen3-8b 모델을 지정합니다.
-        lmstudio_model = LiteLlm(
-            model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
-            api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
-            api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
-        )
-        
-        self.agent = LlmAgent(
-            model=lmstudio_model,  # agent를 구동할 모델 선택
-            name="mysql_assistant",
-            instruction=SYSTEM_PROMPT,
-            tools=toolsets
-        )
-        
-        # 현재 활성화된 모델: LMStudio (OpenAI 호환 API)
-        # 다른 모델을 사용하려면 아래 주석 처리된 코드 중 하나를 활성화하고
-        # 현재 활성화된 코드를 주석 처리하세요.
-        
-        # LMStudio 모델을 사용하는 경우:
-        # self.agent = LlmAgent(
-        #     model=lmstudio_model,  # LMStudio의 OpenAI 호환 API 사용
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장
         # =생성한 에이전트 객체를 반드시 'root_agent' 라는 이름의 변수에 할당합니다.
         # ADK는 이 변수 이름을 기준으로 에이전트를 찾습니다.
@@ -345,22 +330,9 @@ class AgentWrapper:
             try:
                 # 연결 방법 결정
                 if server.get("type") == "http":
-                    # HTTP 연결 시 인증 설정을 headers로 처리
-                    # headers = None
-                    # if server.get("auth"):
-                    #     auth = server["auth"]
-                    #     if auth.get("scheme") == "bearer" and auth.get("token"):
-                    #         headers = {"Authorization": f"Bearer {auth['token']}"}
-                    #     elif auth.get("scheme") == "basic" and auth.get("username") and auth.get("password"):
-                    #         import base64
-                    #         credentials = base64.b64encode(f"{auth['username']}:{auth['password']}".encode()).decode()
-                    #         headers = {"Authorization": f"Basic {credentials}"}
-                    #     elif auth.get("scheme") == "header" and auth.get("token"):
-                    #         headers = {auth.get("header_name", "X-API-Key"): auth["token"]}
-                    
+                   
                     conn = StreamableHTTPServerParams(
-                        url=server["url"],
-                        #headers=headers
+                        url=server["url"]
                     )
 
                 elif server.get("type") == "stdio":

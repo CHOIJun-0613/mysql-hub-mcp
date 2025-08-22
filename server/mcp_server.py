@@ -187,6 +187,34 @@ async def run_mcp_server():
     logger.info(f"MCP 서버 호스트: {config.MCP_SERVER_HOST}")
     logger.info(f"MCP 서버 포트: {config.MCP_SERVER_PORT}")
     
+    # Windows 환경에서 asyncio 이벤트 루프 정책 설정
+    if sys.platform == "win32":
+        try:
+            import asyncio
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            logger.info("Windows 환경에 맞는 이벤트 루프 정책을 설정했습니다.")
+            
+            # Windows 환경에서 연결 오류를 무시하는 예외 핸들러 설정
+            def handle_connection_error(loop, context):
+                if isinstance(context.get('exception'), ConnectionResetError):
+                    # ConnectionResetError는 무시 (일반적인 클라이언트 연결 끊김)
+                    logger.debug(f"클라이언트 연결이 끊어졌습니다: {context.get('exception')}")
+                else:
+                    # 다른 예외는 로깅
+                    logger.error(f"이벤트 루프 오류: {context}")
+            
+            # 현재 이벤트 루프에 예외 핸들러 설정
+            try:
+                loop = asyncio.get_event_loop()
+                loop.set_exception_handler(handle_connection_error)
+                logger.info("Windows 환경에 맞는 예외 핸들러를 설정했습니다.")
+            except RuntimeError:
+                # 이벤트 루프가 아직 생성되지 않은 경우
+                pass
+                
+        except Exception as e:
+            logger.warning(f"Windows 이벤트 루프 정책 설정 실패: {e}")
+    
     # 종료 이벤트를 위한 asyncio.Event
     shutdown_event = asyncio.Event()
     
@@ -320,7 +348,41 @@ def _cleanup_resources():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(run_mcp_server())
+        # Windows 환경에서 asyncio 이벤트 루프 정책 설정
+        if sys.platform == "win32":
+            try:
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                
+                # Windows 환경에서 연결 오류를 무시하는 예외 핸들러 설정
+                def handle_connection_error(loop, context):
+                    if isinstance(context.get('exception'), ConnectionResetError):
+                        # ConnectionResetError는 무시 (일반적인 클라이언트 연결 끊김)
+                        logger.debug(f"클라이언트 연결이 끊어졌습니다: {context.get('exception')}")
+                    else:
+                        # 다른 예외는 로깅
+                        logger.error(f"이벤트 루프 오류: {context}")
+                
+                # asyncio.run() 실행 후 이벤트 루프에 예외 핸들러 설정
+                def run_with_exception_handler():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.set_exception_handler(handle_connection_error)
+                    return loop
+                
+                # 커스텀 이벤트 루프로 실행
+                loop = run_with_exception_handler()
+                try:
+                    loop.run_until_complete(run_mcp_server())
+                finally:
+                    loop.close()
+                    
+            except Exception as e:
+                logger.warning(f"Windows 이벤트 루프 정책 설정 실패: {e}")
+                # 기본 방식으로 실행
+                asyncio.run(run_mcp_server())
+        else:
+            # Windows가 아닌 환경에서는 기본 방식으로 실행
+            asyncio.run(run_mcp_server())
     except KeyboardInterrupt:
         logger.info("🚨=====[MCP] 메인 스레드에서 Ctrl+C를 받았습니다.")
         _cleanup_resources()

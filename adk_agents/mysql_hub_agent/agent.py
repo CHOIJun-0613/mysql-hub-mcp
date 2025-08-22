@@ -8,6 +8,8 @@
 # ------------------------------------------------------------------------------
 
 import asyncio
+import logging
+import warnings
 from rich import print  # 컬러 터미널 로깅을 위해 사용
 from dotenv import load_dotenv
 
@@ -24,6 +26,20 @@ from google.adk.tools.mcp_tool import StdioConnectionParams
 # Non-Google LLM을 연결하기 위한 LiteLLM 래퍼
 from google.adk.models.lite_llm import LiteLlm
 
+# AI Provider 설정을 위한 import
+try:
+    from ai_providers import ai_provider_manager
+except ImportError:
+    # 상대 import 시도
+    try:
+        from .ai_providers import ai_provider_manager
+    except ImportError:
+        # 절대 경로 import 시도
+        import sys
+        import os
+        sys.path.append(os.path.dirname(__file__))
+        from ai_providers import ai_provider_manager
+
 # config.json 파일을 읽기 위한 유틸리티 함수
 try:
     from utilities import read_config_json
@@ -37,7 +53,11 @@ except ImportError:
         import os
         sys.path.append(os.path.dirname(__file__))
         from utilities import read_config_json
-
+# Google ADK의 실험적 기능 경고 숨기기
+warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*Field name.*shadows an attribute.*", category=UserWarning)
+logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
 # ------------------------------------------------------------------------------
 # 설정 상수
 # ------------------------------------------------------------------------------
@@ -243,32 +263,31 @@ class AgentWrapper:
         """
         toolsets = self._load_toolsets()
 
-        # 로드된 도구세트로 ADK LLM Agent 구성
-        # self.agent = LlmAgent(
-        #     model=GEMINI_MODEL_NAME,  # agent를 구동할 모델 선택
-        #     name="mysql_assistant",
-        #     instruction=SYSTEM_PROMPT,
-        #     tools=toolsets
-        # )
-        
-        # LiteLlm 클래스를 사용하여 Ollama에서 제공하는 모델을 지정합니다.
-        # 'ollama/' 접두사를 사용하고 모델 이름을 명시합니다.
-        #local_llama_model = LiteLlm(model=LLAMA_MODEL_NAME)
-        #llmodel = LiteLlm(model=QWEN_MODEL_NAME)
-        
-        # LMStudio를 사용하여 qwen/qwen3-8b 모델을 지정합니다.
-        lmstudio_model = LiteLlm(
-            model=LMSTUDIO_QWEN_MODEL_NAME,  # LMStudio는 OpenAI 호환 모델명을 사용
-            api_base="http://localhost:1234/v1",  # LMStudio 기본 API 엔드포인트
-            api_key="not-needed" # API 키가 필요 없음을 명시적으로 표시
-        )
-        
-        self.agent = LlmAgent(
-            model=lmstudio_model,  # agent를 구동할 모델 선택
-            name="mysql_assistant",
-            instruction=ENG_SYSTEM_PROMPT,
-            tools=toolsets
-        )
+        # AI Provider Manager를 사용하여 현재 설정된 Provider에 맞는 LLM 생성
+        try:
+            llm = ai_provider_manager.create_llm()
+            provider_info = ai_provider_manager.get_provider_info()
+            print(f"\n[bold blue]🤖 AI Provider: {provider_info['provider']}[/bold blue]")
+            print(f"[bold blue]📱 모델: {provider_info['model']}[/bold blue]")
+            
+            # 로드된 도구세트로 ADK LLM Agent 구성
+            self.agent = LlmAgent(
+                model=llm,  # AI Provider Manager에서 생성한 LLM 사용
+                name="mysql_assistant",
+                instruction=SYSTEM_PROMPT,
+                tools=toolsets
+            )
+        except Exception as e:
+            print(f"[bold red]⚠️ AI Provider 초기화 실패: {e}[/bold red]")
+            print("[bold yellow]Google Gemini로 폴백합니다.[/bold yellow]")
+            
+            # 폴백: Google Gemini 사용
+            self.agent = LlmAgent(
+                model="gemini-1.5-flash",  # 기본 Google Gemini 모델
+                name="mysql_assistant",
+                instruction=SYSTEM_PROMPT,
+                tools=toolsets
+            )
         
         
         self._toolsets = toolsets  # 나중에 정리를 위해 도구세트 저장

@@ -2,13 +2,7 @@
     "mcpServers": {
       "mysql-hub-mcp": {
         "type": "http",
-        "url": "http://localhost:7000/mcp/",
-        "auth": {
-          "scheme": "none",
-          "token": "",
-          "username": "",
-          "password": ""
-        }
+        "url": "http://localhost:7000/mcp/"
       }
     }
 }
