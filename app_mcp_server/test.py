@@ -11,6 +11,31 @@ from database import DatabaseManager
 import sqlalchemy
 import os
 
+# 다중 데이터베이스 지원 테스트
+def test_multiple_databases():
+    """다중 데이터베이스 지원을 테스트합니다."""
+    print("=== 다중 데이터베이스 지원 테스트 ===")
+    
+    # 현재 설정된 데이터베이스 타입 확인
+    print(f"현재 설정된 데이터베이스 타입: {config.DATABASE_TYPE}")
+    
+    # 데이터베이스 연결 URL 확인
+    try:
+        db_url = config.get_database_url()
+        print(f"데이터베이스 연결 URL: {db_url}")
+    except Exception as e:
+        print(f"데이터베이스 URL 생성 실패: {e}")
+        return
+    
+    # 데이터베이스 정보 확인
+    try:
+        db_manager = DatabaseManager()
+        db_info = db_manager.get_database_info()
+        print(f"데이터베이스 정보: {json.dumps(db_info, ensure_ascii=False, indent=2)}")
+    except Exception as e:
+        print(f"데이터베이스 정보 조회 실패: {e}")
+
+# 기존 테스트 코드
 result = {
     'role': 'assistant', 
     'tool_calls': [
@@ -123,9 +148,16 @@ for tc in parsed_tool_calls:
 
     print(f"🧠 LLM 요청: 로컬 함수 {tc['tool_call_id']}, {func_name}, {index}, ({json.dumps(func_args, ensure_ascii=False)}) 실행")
 
-db_manager = DatabaseManager()
-table_list =   db_manager.get_table_list()
-print(table_list)
+# 다중 데이터베이스 테스트 실행
+test_multiple_databases()
+
+# 기존 데이터베이스 테스트
+try:
+    db_manager = DatabaseManager()
+    table_list = db_manager.get_table_list()
+    print(f"테이블 목록: {table_list}")
+except Exception as e:
+    print(f"테이블 목록 조회 실패: {e}")
 
 
 

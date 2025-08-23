@@ -18,7 +18,7 @@ from config import config
 from database import db_manager
 from ai_provider import ai_manager
 from ai_worker import strip_markdown_sql, natural_language_query_work
-from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, init_environment
+from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, init_environment, json_to_pretty_string
 from common import AIProviderRequest, Response, clear_screen
 
 # stdout clear
@@ -117,7 +117,7 @@ async def shutdown_event():
 async def root():
     """루트 엔드포인트"""
     return {
-        "message": "MySQL Hub MCP Server",
+        "message": "MySQL Hub App Server",
         "version": "0.1.0",
         "status": "running"
     }
@@ -157,7 +157,7 @@ async def get_database_info():
         # 정보 데이터에서 Decimal 타입 변환
         converted_info = convert_decimal_in_info(info)
         
-        logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{converted_info}\n")
+        logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{json_to_pretty_string(converted_info)}\n")
         return Response(success=True, data=converted_info)
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 데이터베이스 정보 조회 실패: {e}")
@@ -175,9 +175,25 @@ async def execute_sql(request: SQLQueryRequest):
         logger.info(f"🚨=====[HTTP] 원본 SQL: \n{request.query}\n")
         logger.info(f"🚨=====[HTTP] 정리된 SQL: \n{clean_query}\n")
         
-        # # SQL 키워드가 포함되어 있는지 확인
+        # SQL 구문 사전 검증
+        clean_query_lower = clean_query.lower().strip()
+        
+        # 테이블명에 작은따옴표가 잘못 사용된 경우 감지
+        if "'" in clean_query_lower:
+            # FROM 절에서 테이블명 확인
+            from_pattern = r'from\s+[\'"`]?(\w+)[\'"`]?\s'
+            from_match = re.search(from_pattern, clean_query_lower)
+            if from_match:
+                table_name = from_match.group(1)
+                if f"'{table_name}'" in clean_query or f"'{table_name}'" in clean_query:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"테이블명 '{table_name}'에 작은따옴표를 사용할 수 없습니다. 백틱(`)을 사용하거나 따옴표 없이 입력하세요. 예: `{table_name}` 또는 {table_name}"
+                    )
+        
+        # SQL 키워드가 포함되어 있는지 확인
         sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP"]
-        if not any(keyword.lower() in clean_query.lower() for keyword in sql_keywords):
+        if not any(keyword.lower() in clean_query_lower for keyword in sql_keywords):
             raise HTTPException(status_code=400, detail="유효한 SQL 쿼리가 아닙니다.")
         
         # 쿼리 유효성 검사
@@ -221,7 +237,7 @@ async def execute_sql(request: SQLQueryRequest):
         # 결과 데이터에서 Decimal 타입 변환
         converted_result = convert_decimal_in_result(result)
         
-        logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{converted_result}\n")
+        logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{json_to_pretty_string(converted_result)}\n")
         return Response(success=True, data=converted_result)
         
     except HTTPException:
@@ -259,7 +275,7 @@ async def natural_language_query(request: NaturalLanguageRequest):
         # 응답 데이터에서 Decimal 타입 변환
         converted_response = convert_decimal_in_response(response)
 
-        logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{converted_response}\n")
+        logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{json_to_pretty_string(converted_response)}\n")
         return Response(success=True, data=converted_response)
             
     except Exception as e:
@@ -292,7 +308,7 @@ async def get_table_list():
         # 테이블 목록 데이터에서 Decimal 타입 변환
         converted_tables = convert_decimal_in_tables(tables)
         
-        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{converted_tables}\n")
+        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{json_to_pretty_string(converted_tables)}\n")
         return Response(success=True, data=converted_tables)
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 테이블 목록 조회 실패: {e}")
@@ -324,7 +340,7 @@ async def get_table_schema(request: TableSchemaRequest):
         # 스키마 데이터에서 Decimal 타입 변환
         converted_schema = convert_decimal_in_schema(schema)
         
-        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{converted_schema}\n")
+        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{json_to_pretty_string(converted_schema)}\n")
         return Response(success=True, data=converted_schema)
         
     except HTTPException:

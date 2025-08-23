@@ -1,10 +1,11 @@
 # MySQL Hub MCP
 
-MySQL 데이터베이스와 자연어 쿼리를 지원하는 MCP 서버입니다.
+MySQL, PostgreSQL, Oracle 데이터베이스와 자연어 쿼리를 지원하는 MCP 서버입니다.
 
 ## 기능
 
-- MySQL 데이터베이스 연결 및 쿼리 실행
+- **다중 데이터베이스 지원**: MySQL, PostgreSQL, Oracle
+- 데이터베이스 연결 및 쿼리 실행
 - 자연어를 SQL로 변환
 - AI Provider 지원 (Groq, Ollama, LM Studio)
 - Tool 지원 LLM을 통한 지능형 데이터베이스 쿼리
@@ -16,12 +17,30 @@ MySQL 데이터베이스와 자연어 쿼리를 지원하는 MCP 서버입니다
 `.env` 파일을 생성하고 다음 내용을 입력하세요:
 
 ```env
+# 데이터베이스 타입 선택 (mysql, postgresql, oracle)
+DATABASE_TYPE=mysql
+
 # MySQL 데이터베이스 설정
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=your_database
+
+# PostgreSQL 데이터베이스 설정
+POSTGRESQL_HOST=localhost
+POSTGRESQL_PORT=5432
+POSTGRESQL_USER=postgres
+POSTGRESQL_PASSWORD=your_password
+POSTGRESQL_DATABASE=your_database
+
+# Oracle 데이터베이스 설정
+ORACLE_HOST=localhost
+ORACLE_PORT=1521
+ORACLE_USER=system
+ORACLE_PASSWORD=your_password
+ORACLE_SERVICE_NAME=XE
+# ORACLE_SID=XE  # SID를 사용하는 경우 주석 해제
 
 # AI Provider 설정 (groq, ollama, lmstudio)
 AI_PROVIDER=ollama
@@ -52,13 +71,26 @@ SERVER_PORT=8000
 
 ```bash
 # 서버 의존성 설치
-cd server
+cd app_mcp_server
 pip install -r requirements.txt
 
 # 클라이언트 의존성 설치
-cd ../client
+cd ../app_client
 pip install -r requirements.txt
 ```
+
+#### 데이터베이스별 추가 패키지
+
+**PostgreSQL 사용 시:**
+```bash
+pip install psycopg2-binary
+```
+
+**Oracle 사용 시:**
+```bash
+pip install cx-Oracle
+```
+**주의**: Oracle 클라이언트 라이브러리가 시스템에 설치되어 있어야 합니다.
 
 ### 3. AI Provider 설정
 

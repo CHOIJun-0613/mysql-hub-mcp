@@ -151,6 +151,10 @@ def json_to_pretty_string(data):
             else:
                 return obj
         
+        # Response 객체인 경우 model_dump() 사용
+        if hasattr(data, 'model_dump'):
+            data = data.model_dump()
+        
         # Decimal 타입을 float로 변환
         converted_data = convert_decimal(data)
         
