@@ -35,9 +35,9 @@ from google.adk.tools.mcp_tool import StdioConnectionParams
 # Ollama, LMStudio, OpenAI 등 다양한 LLM 제공업체를 지원합니다.
 from google.adk.models.lite_llm import LiteLlm
 
-from adk_client.utilities import read_config_json
-from adk_client.ai_providers import ai_provider_manager
-from adk_client.prompt import ENG_SYSTEM_PROMPT, SYSTEM_PROMPT,SYSTEM_PROMPT_SHORT
+from .utilities import read_config_json
+from .ai_providers import ai_provider_manager
+from .prompt import ENG_SYSTEM_PROMPT, SYSTEM_PROMPT,SYSTEM_PROMPT_SHORT
 
 # Google ADK의 실험적 기능 경고 숨기기
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)

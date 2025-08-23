@@ -22,7 +22,7 @@ from google.adk.runners import Runner
 # 메모리 내 세션 서비스는 세션 데이터를 로컬에 저장합니다
 from google.adk.sessions import InMemorySessionService
 
-from adk_client.agent import AgentWrapper
+from .agent import AgentWrapper
 
 # Google ADK의 실험적 기능 경고 숨기기
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)

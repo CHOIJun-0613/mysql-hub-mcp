@@ -17,7 +17,8 @@ import warnings
 # Rich 라이브러리에서 컬러 터미널 출력을 위한 print 함수
 from rich import print
 
-from adk_client.client import MCPClient
+from .client import MCPClient
+from .ai_config import ai_config
 # Google ADK의 실험적 기능 경고 숨기기
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
@@ -71,7 +72,6 @@ async def chat_loop():
 
     # AI Provider 정보 표시
     try:
-        from ai_config import ai_config
         provider_info = ai_config.get_provider_info()
         print(f"🤖 AI Provider: {provider_info['provider']}")
         print(f"📱 모델: {provider_info['model']}")
