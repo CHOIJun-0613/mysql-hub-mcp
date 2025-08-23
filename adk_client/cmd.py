@@ -16,22 +16,13 @@ import warnings
 
 # Rich 라이브러리에서 컬러 터미널 출력을 위한 print 함수
 from rich import print
+
+from adk_client.client import MCPClient
 # Google ADK의 실험적 기능 경고 숨기기
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*Field name.*shadows an attribute.*", category=UserWarning)
 logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
-# MCPClient 클래스 임포트
-try:
-    from adk_client.client import MCPClient
-except ImportError:
-    # 상대 import 시도
-    try:
-        from .client import MCPClient
-    except ImportError:
-        # 절대 경로 import 시도
-        from client import MCPClient
-
 
 
 # ------------------------------------------------------------------------------

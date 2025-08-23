@@ -21,21 +21,15 @@ from google.adk.runners import Runner
 
 # 메모리 내 세션 서비스는 세션 데이터를 로컬에 저장합니다
 from google.adk.sessions import InMemorySessionService
+
+from adk_client.agent import AgentWrapper
+
 # Google ADK의 실험적 기능 경고 숨기기
 warnings.filterwarnings("ignore", message=".*BaseAuthenticatedTool.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*EXPERIMENTAL.*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*Field name.*shadows an attribute.*", category=UserWarning)
 
-# ADK agent와 도구를 빌드하고 관리하기 위한 커스텀 래퍼
-try:
-    from adk_client.agent import AgentWrapper
-except ImportError:
-    # 상대 import 시도
-    try:
-        from .agent import AgentWrapper
-    except ImportError:
-        # 절대 경로 import 시도
-        from agent import AgentWrapper
+
 
 logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
 # ------------------------------------------------------------------------------
