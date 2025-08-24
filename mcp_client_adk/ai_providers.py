@@ -10,16 +10,20 @@ from typing import Optional, Dict, Any
 
 # Google ADK 모델들
 try:
-    from google.adk.models.google_llm import GoogleLlm
+    from google.adk.models.google_llm import Gemini
+    GOOGLE_LLM_AVAILABLE = True
 except ImportError:
-    # GoogleLlm이 없는 경우 문자열로 대체
-    GoogleLlm = str
+    # Gemini가 없는 경우 플래그로 관리
+    Gemini = None
+    GOOGLE_LLM_AVAILABLE = False
 
 try:
     from google.adk.models.lite_llm import LiteLlm
+    LITE_LLM_AVAILABLE = True
 except ImportError:
-    # LiteLlm이 없는 경우 문자열로 대체
-    LiteLlm = str
+    # LiteLlm이 없는 경우 플래그로 관리
+    LiteLlm = None
+    LITE_LLM_AVAILABLE = False
 
 # AI 설정
 try:
@@ -59,22 +63,25 @@ class GoogleAIProvider(BaseAIProvider):
         self.api_key = ai_config.google_api_key
         self.model_name = ai_config.gemini_model_name
     
-    def create_llm(self) -> GoogleLlm:
+    def create_llm(self):
         """Google Gemini LLM을 생성합니다."""
         if not self.is_available():
             raise ValueError("Google API 키가 설정되지 않았습니다.")
         
-        # 환경변수 설정 (GoogleLlm이 자동으로 읽음)
+        if not GOOGLE_LLM_AVAILABLE:
+            raise ImportError("Gemini 모듈을 사용할 수 없습니다. google-adk 패키지를 설치해주세요.")
+        
+        # 환경변수 설정 (Gemini이 자동으로 읽음)
         os.environ["GOOGLE_API_KEY"] = self.api_key
         
-        return GoogleLlm(
+        return Gemini(
             model_name=self.model_name,
             temperature=0.1
         )
     
     def is_available(self) -> bool:
         """Google Gemini가 사용 가능한지 확인합니다."""
-        return self.api_key is not None
+        return self.api_key is not None and GOOGLE_LLM_AVAILABLE
     
     def get_model_name(self) -> str:
         """모델명을 반환합니다."""
@@ -87,10 +94,13 @@ class GroqAIProvider(BaseAIProvider):
         self.api_key = ai_config.groq_api_key
         self.model_name = ai_config.groq_model_name
     
-    def create_llm(self) -> LiteLlm:
+    def create_llm(self):
         """Groq LLM을 생성합니다."""
         if not self.is_available():
             raise ValueError("Groq API 키가 설정되지 않았습니다.")
+        
+        if not LITE_LLM_AVAILABLE:
+            raise ImportError("LiteLlm 모듈을 사용할 수 없습니다. lite-llm 패키지를 설치해주세요.")
         
         # LiteLlm을 통해 Groq 연결
         return LiteLlm(
@@ -101,7 +111,7 @@ class GroqAIProvider(BaseAIProvider):
     
     def is_available(self) -> bool:
         """Groq가 사용 가능한지 확인합니다."""
-        return self.api_key is not None
+        return self.api_key is not None and LITE_LLM_AVAILABLE
     
     def get_model_name(self) -> str:
         """모델명을 반환합니다."""
@@ -114,10 +124,13 @@ class LMStudioAIProvider(BaseAIProvider):
         self.base_url = ai_config.lmstudio_base_url
         self.model_name = ai_config.lmstudio_qwen_model_name
     
-    def create_llm(self) -> LiteLlm:
+    def create_llm(self):
         """LM Studio LLM을 생성합니다."""
         if not self.is_available():
             raise ValueError("LM Studio가 설정되지 않았습니다.")
+        
+        if not LITE_LLM_AVAILABLE:
+            raise ImportError("LiteLlm 모듈을 사용할 수 없습니다. lite-llm 패키지를 설치해주세요.")
         
         # LiteLlm을 통해 LM Studio 연결
         return LiteLlm(
@@ -128,8 +141,8 @@ class LMStudioAIProvider(BaseAIProvider):
     
     def is_available(self) -> bool:
         """LM Studio가 사용 가능한지 확인합니다."""
-        # LM Studio는 로컬에서 실행되므로 항상 사용 가능하다고 가정
-        return True
+        # LM Studio는 로컬에서 실행되므로 LiteLlm만 사용 가능한지 확인
+        return LITE_LLM_AVAILABLE
     
     def get_model_name(self) -> str:
         """모델명을 반환합니다."""

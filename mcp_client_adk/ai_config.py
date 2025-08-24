@@ -8,7 +8,10 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # .env 파일 로드
-load_dotenv()
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, '.env')
+load_dotenv(env_path)
 
 class AIConfig:
     """AI Provider 설정 클래스"""

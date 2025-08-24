@@ -5,7 +5,7 @@
 
 import os
 import logging
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -41,6 +41,9 @@ setup_logging_immediate()
 
 class Config:
     """설정 클래스"""
+    
+    # 데이터 소스 선택 (DB 또는 RAG)
+    DATA_SOURCE: str = os.getenv("DATA_SOURCE", "DB").upper()
     
     # 데이터베이스 타입 선택 (mysql, postgresql, oracle)
     DATABASE_TYPE: str = os.getenv("DATABASE_TYPE", "mysql").lower()

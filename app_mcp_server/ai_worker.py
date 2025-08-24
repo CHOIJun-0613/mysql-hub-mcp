@@ -13,12 +13,22 @@ from ai_provider import ai_manager
 from prompt import make_system_prompt
 from common import Response
 
+from rag_integration import get_tables_from_rag, get_schema_from_rag
+
 
 async def get_table_list(database_name: str = None):
-    return db_manager.get_table_list(database_name)
+    """테이블 목록을 반환합니다."""
+    if config.DATA_SOURCE == "RAG":
+        return get_tables_from_rag()
+    else:
+        return db_manager.get_table_list(database_name)
 
 async def get_table_schema(table_name: str):
-    return db_manager.get_table_schema(table_name)
+    """테이블 스키마를 반환합니다."""
+    if config.DATA_SOURCE == "RAG":
+        return get_schema_from_rag(table_name)
+    else:
+        return db_manager.get_table_schema(table_name)
 
 # LLM이 반환한 함수 이름(문자열)을 실제 실행할 Python 함수와 연결합니다.
 available_tools = {

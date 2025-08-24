@@ -19,6 +19,8 @@ from ai_worker import natural_language_query_work,make_system_prompt, strip_mark
 from config import config
 from common import clear_screen, init_environment, json_to_pretty_string, convert_for_json_serialization
 
+from rag_integration import get_tables_from_rag, get_schema_from_rag
+
 logger = logging.getLogger(__name__)
 host = config.MCP_SERVER_HOST
 port = config.MCP_SERVER_PORT
@@ -86,8 +88,14 @@ async def get_table_list() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: 테이블 목록[{"table_name": "테이블 이름", "table_comment": "테이블 코멘트"}]
     """
     try:
-        tables = db_manager.get_table_list()
-        logger.info(f"🚨=====[MCP] 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
+        # 환경변수에 따라 DB 또는 RAG에서 조회
+        if config.DATA_SOURCE == "RAG":
+            tables = get_tables_from_rag()
+            logger.info(f"🚨=====[MCP] RAG에서 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
+        else:
+            tables = db_manager.get_table_list()
+            logger.info(f"🚨=====[MCP] DB에서 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
+        
         return tables
     except Exception as e:
         logger.error(f"🚨=====[MCP] 테이블 목록 조회 실패: {e}")
@@ -98,21 +106,24 @@ async def get_table_schema(table_name: str) -> Dict[str, Any]:
     """테이블 스키마를 반환합니다.
     
     Args:
-        table_name: 스키마를 조회할 테이블 이름
+        table_name (str): 테이블 이름
         
     Returns:
-        List[Dict[str, Any]]: 테이블 스키마 정보 (컬럼명, 타입, 제약조건 등)
+        Dict[str, Any]: 테이블 스키마 정보
     """
     try:
-        if not table_name:
-            raise ValueError("테이블 이름이 제공되지 않았습니다.")
+        # 환경변수에 따라 DB 또는 RAG에서 조회
+        if config.DATA_SOURCE == "RAG":
+            schema = get_schema_from_rag(table_name)
+            logger.info(f"🚨=====[MCP] RAG에서 테이블 '{table_name}' 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
+        else:
+            schema = db_manager.get_table_schema(table_name)
+            logger.info(f"🚨=====[MCP] DB에서 테이블 '{table_name}' 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
         
-        schema = db_manager.get_table_schema(table_name)
-        logger.info(f"🚨=====[MCP] 테이블 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
         return schema
     except Exception as e:
-        logger.error(f"🚨=====[MCP] 테이블 스키마 조회 실패: {e}")
-        return []
+        logger.error(f"🚨=====[MCP] 테이블 '{table_name}' 스키마 조회 실패: {e}")
+        return {"error": str(e)}
 
 @mcp.tool(description="입력받은 SQL 쿼리를 실행합니다.", title="SQL 쿼리 실행")
 async def execute_sql(sql: str) -> Dict[str, Any]:

@@ -21,6 +21,8 @@ from ai_worker import strip_markdown_sql, natural_language_query_work
 from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, init_environment, json_to_pretty_string
 from common import AIProviderRequest, Response, clear_screen, convert_for_json_serialization
 
+from rag_integration import get_tables_from_rag, get_schema_from_rag
+
 # stdout clear
 #clear_screen()
 
@@ -212,8 +214,6 @@ async def execute_sql(request: SQLQueryRequest):
         logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{json_to_pretty_string(converted_result)}\n")
         return Response(success=True, data=converted_result)
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"🚨=====[HTTP] SQL 실행 실패: {e}")
         return Response(success=False, error=str(e))
@@ -243,41 +243,39 @@ async def natural_language_query(request: NaturalLanguageRequest):
             error=f"자연어 쿼리 처리 중 오류가 발생했습니다: {e}"
         )
 
-@app.get("/database/tables")
+@app.get("/api/tables", response_model=List[Dict[str, str]])
 async def get_table_list():
     """테이블 목록을 반환합니다."""
     try:
-        tables = db_manager.get_table_list()
+        # 환경변수에 따라 DB 또는 RAG에서 조회
+        if config.DATA_SOURCE == "RAG":
+            tables = get_tables_from_rag()
+            logger.info(f"🚨=====[HTTP] RAG에서 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
+        else:
+            tables = db_manager.get_table_list()
+            logger.info(f"🚨=====[HTTP] DB에서 테이블 목록 조회 결과: \n{json_to_pretty_string(tables)}\n")
         
-        # JSON 직렬화를 위해 데이터 타입 변환
-        converted_tables = convert_for_json_serialization(tables)
-        
-        logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{json_to_pretty_string(converted_tables)}\n")
-        return Response(success=True, data=converted_tables)
+        return tables
     except Exception as e:
         logger.error(f"🚨=====[HTTP] 테이블 목록 조회 실패: {e}")
-        return Response(success=False, error=str(e))
+        return []
 
-@app.post("/database/table-schema")
+@app.post("/api/schema", response_model=Dict[str, Any])
 async def get_table_schema(request: TableSchemaRequest):
     """테이블 스키마를 반환합니다."""
     try:
-        if not request.table_name:
-            return Response(success=False, error="테이블 이름이 제공되지 않았습니다.")
+        # 환경변수에 따라 DB 또는 RAG에서 조회
+        if config.DATA_SOURCE == "RAG":
+            schema = get_schema_from_rag(request.table_name)
+            logger.info(f"🚨=====[HTTP] RAG에서 테이블 '{request.table_name}' 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
+        else:
+            schema = db_manager.get_table_schema(request.table_name)
+            logger.info(f"🚨=====[HTTP] DB에서 테이블 '{request.table_name}' 스키마 조회 결과: \n{json_to_pretty_string(schema)}\n")
         
-        schema = db_manager.get_table_schema(request.table_name)
-        
-        # JSON 직렬화를 위해 데이터 타입 변환
-        converted_schema = convert_for_json_serialization(schema)
-        
-        logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{json_to_pretty_string(converted_schema)}\n")
-        return Response(success=True, data=converted_schema)
-        
-    except HTTPException:
-        raise
+        return schema
     except Exception as e:
-        logger.error(f"🚨=====[HTTP] 테이블 스키마 조회 실패: {e}")
-        return Response(success=False, error=str(e))
+        logger.error(f"🚨=====[HTTP] 테이블 '{request.table_name}' 스키마 조회 실패: {e}")
+        return {"error": str(e)}
 
 @app.get("/ai/provider")
 async def get_current_ai_provider():

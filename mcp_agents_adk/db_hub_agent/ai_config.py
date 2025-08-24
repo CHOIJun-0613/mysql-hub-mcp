@@ -8,7 +8,10 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # .env 파일 로드
-load_dotenv()
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, '.env')
+load_dotenv(env_path)
 
 class AIConfig:
     """AI Provider 설정 클래스"""
@@ -28,6 +31,14 @@ class AIConfig:
         # LM Studio 설정
         self.lmstudio_base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
         self.lmstudio_qwen_model_name = os.getenv("LMSTUDIO_QWEN_MODEL_NAME", "lm_studio/qwen/qwen3-8b")
+        
+        # 디버깅을 위한 로그
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"AI_CONFIG 초기화 - ai_provider: {self.ai_provider}")
+        logger.info(f"AI_CONFIG 초기화 - google_api_key: {'설정됨' if self.google_api_key else '설정되지 않음'}")
+        logger.info(f"AI_CONFIG 초기화 - groq_api_key: {'설정됨' if self.groq_api_key else '설정되지 않음'}")
+        logger.info(f"AI_CONFIG 초기화 - gemini_model_name: {self.gemini_model_name}")
     
     def get_current_provider(self) -> str:
         """현재 설정된 AI Provider를 반환합니다."""

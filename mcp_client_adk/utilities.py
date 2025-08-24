@@ -9,7 +9,9 @@ from rich.syntax import Syntax
 from dotenv import load_dotenv
 
 # 환경 변수 로드
-load_dotenv()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, '.env')
+load_dotenv(env_path)
 logger = logging.getLogger(__name__)
 
 def read_config_json():

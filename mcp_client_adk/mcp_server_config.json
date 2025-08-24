@@ -1,6 +1,6 @@
 {
     "mcpServers": {
-      "mysql-hub-mcp": {
+      "db-hub-mcp": {
         "type": "http",
         "url": "http://localhost:7000/mcp/"
       }
