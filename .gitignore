@@ -33,3 +33,6 @@ bridge/logs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Vector DB
+vector_db/

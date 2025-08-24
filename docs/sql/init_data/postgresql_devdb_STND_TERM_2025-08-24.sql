@@ -21,7 +21,6 @@ COMMENT ON COLUMN STND_TERM.TERM_ENG_NM IS '용어 영문명';
 COMMENT ON COLUMN STND_TERM.TERM_DESC IS '용어 설명';
 COMMENT ON COLUMN STND_TERM.TERM_ENG_ABR_NM IS '용어 영문 약어명 (단어약어_단어약어)';
 
-
 -- =================================================================
 -- 표준 용어 데이터 삽입 (PostgreSQL)
 -- =================================================================

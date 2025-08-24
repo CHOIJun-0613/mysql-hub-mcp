@@ -1,0 +1,1 @@
+pip install langchain langchain_community sentence-transformers chromadb
