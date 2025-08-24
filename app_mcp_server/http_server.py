@@ -8,7 +8,7 @@ import logging
 import signal
 import sys
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pydantic.networks import KafkaDsn
@@ -19,7 +19,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from ai_worker import strip_markdown_sql, natural_language_query_work
 from common import SQLQueryRequest, NaturalLanguageRequest, TableSchemaRequest, init_environment, json_to_pretty_string
-from common import AIProviderRequest, Response, clear_screen
+from common import AIProviderRequest, Response, clear_screen, convert_for_json_serialization
 
 # stdout clear
 #clear_screen()
@@ -140,22 +140,8 @@ async def get_database_info():
     try:
         info = db_manager.get_database_info()
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        from decimal import Decimal
-        
-        def convert_decimal_in_info(obj):
-            """정보 데이터에서 Decimal 타입을 float로 변환"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal_in_info(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal_in_info(item) for item in obj]
-            else:
-                return obj
-        
-        # 정보 데이터에서 Decimal 타입 변환
-        converted_info = convert_decimal_in_info(info)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_info = convert_for_json_serialization(info)
         
         logger.info(f"🚨=====[HTTP] 데이터베이스 정보 조회 결과: \n{json_to_pretty_string(converted_info)}\n")
         return Response(success=True, data=converted_info)
@@ -168,7 +154,7 @@ async def execute_sql(request: SQLQueryRequest):
     """SQL 쿼리를 실행합니다."""
     try:
         if not request.query:
-            raise HTTPException(status_code=400, detail="SQL 쿼리가 제공되지 않았습니다.")
+            return Response(success=False, error="SQL 쿼리가 제공되지 않았습니다.")
         
         # 마크다운 형식 제거
         clean_query = strip_markdown_sql(request.query)
@@ -186,15 +172,15 @@ async def execute_sql(request: SQLQueryRequest):
             if from_match:
                 table_name = from_match.group(1)
                 if f"'{table_name}'" in clean_query or f"'{table_name}'" in clean_query:
-                    raise HTTPException(
-                        status_code=400, 
-                        detail=f"테이블명 '{table_name}'에 작은따옴표를 사용할 수 없습니다. 백틱(`)을 사용하거나 따옴표 없이 입력하세요. 예: `{table_name}` 또는 {table_name}"
+                    return Response(
+                        success=False, 
+                        error=f"테이블명 '{table_name}'에 작은따옴표를 사용할 수 없습니다. 백틱(`)을 사용하거나 따옴표 없이 입력하세요. 예: `{table_name}` 또는 {table_name}"
                     )
         
         # SQL 키워드가 포함되어 있는지 확인
         sql_keywords = ["SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP"]
         if not any(keyword.lower() in clean_query_lower for keyword in sql_keywords):
-            raise HTTPException(status_code=400, detail="유효한 SQL 쿼리가 아닙니다.")
+            return Response(success=False, error="유효한 SQL 쿼리가 아닙니다.")
         
         # 쿼리 유효성 검사
         if not db_manager.validate_query(clean_query):
@@ -211,7 +197,7 @@ async def execute_sql(request: SQLQueryRequest):
                         error_detail = f"'{word}'는 MySQL 예약어입니다. 백틱(`)으로 감싸주세요. 예: `{word}`"
                     break
             
-            raise HTTPException(status_code=400, detail=error_detail)
+            return Response(success=False, error=error_detail)
         
         # 쿼리 실행
         if clean_query.strip().upper().startswith('SELECT'):
@@ -220,22 +206,8 @@ async def execute_sql(request: SQLQueryRequest):
             affected_rows = db_manager.execute_non_query(clean_query)
             result = {"affected_rows": affected_rows}
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        from decimal import Decimal
-        
-        def convert_decimal_in_result(obj):
-            """결과 데이터에서 Decimal 타입을 float로 변환"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal_in_result(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal_in_result(item) for item in obj]
-            else:
-                return obj
-        
-        # 결과 데이터에서 Decimal 타입 변환
-        converted_result = convert_decimal_in_result(result)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_result = convert_for_json_serialization(result)
         
         logger.info(f"🚨=====[HTTP] SQL 실행 결과: \n{json_to_pretty_string(converted_result)}\n")
         return Response(success=True, data=converted_result)
@@ -251,29 +223,15 @@ async def natural_language_query(request: NaturalLanguageRequest):
     """자연어를 SQL로 변환하여 실행합니다."""
     try:
         if not request.question:
-            raise HTTPException(status_code=400, detail="질문이 제공되지 않았습니다.")
+            return Response(success=False, error="질문이 제공되지 않았습니다.")
         # 질문이 수자로만 되어 있거나 글자수가 5 미만인 경우 예외 처리
         if request.question.isdigit() or len(request.question.strip()) < 5:
-            raise HTTPException(status_code=400, detail="질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
+            return Response(success=False, error="질문 내용이 너무 짧거나 수자로만 되어 있어서 모호합니다.")
         
         response = await natural_language_query_work(request.question, config.USE_LLM_TOOLS)
 
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        from decimal import Decimal
-        
-        def convert_decimal_in_response(obj):
-            """응답 데이터에서 Decimal 타입을 float로 변환"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal_in_response(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal_in_response(item) for item in obj]
-            else:
-                return obj
-        
-        # 응답 데이터에서 Decimal 타입 변환
-        converted_response = convert_decimal_in_response(response)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_response = convert_for_json_serialization(response)
 
         logger.info(f"🚨=====[HTTP] 자연어 쿼리 처리 결과: \n{json_to_pretty_string(converted_response)}\n")
         return Response(success=True, data=converted_response)
@@ -291,22 +249,8 @@ async def get_table_list():
     try:
         tables = db_manager.get_table_list()
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        from decimal import Decimal
-        
-        def convert_decimal_in_tables(obj):
-            """테이블 목록 데이터에서 Decimal 타입을 float로 변환"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal_in_tables(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal_in_tables(item) for item in obj]
-            else:
-                return obj
-        
-        # 테이블 목록 데이터에서 Decimal 타입 변환
-        converted_tables = convert_decimal_in_tables(tables)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_tables = convert_for_json_serialization(tables)
         
         logger.info(f"🚨=====[HTTP] 테이블 목록 조회 결과: \n{json_to_pretty_string(converted_tables)}\n")
         return Response(success=True, data=converted_tables)
@@ -319,26 +263,12 @@ async def get_table_schema(request: TableSchemaRequest):
     """테이블 스키마를 반환합니다."""
     try:
         if not request.table_name:
-            raise HTTPException(status_code=400, detail="테이블 이름이 제공되지 않았습니다.")
+            return Response(success=False, error="테이블 이름이 제공되지 않았습니다.")
         
         schema = db_manager.get_table_schema(request.table_name)
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        from decimal import Decimal
-        
-        def convert_decimal_in_schema(obj):
-            """스키마 데이터에서 Decimal 타입을 float로 변환"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal_in_schema(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal_in_schema(item) for item in obj]
-            else:
-                return obj
-        
-        # 스키마 데이터에서 Decimal 타입 변환
-        converted_schema = convert_decimal_in_schema(schema)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_schema = convert_for_json_serialization(schema)
         
         logger.info(f"🚨=====[HTTP] 테이블 스키마 조회 결과: \n{json_to_pretty_string(converted_schema)}\n")
         return Response(success=True, data=converted_schema)

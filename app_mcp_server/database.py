@@ -96,28 +96,56 @@ class DatabaseProvider(ABC):
             raise Exception(f"쿼리 실행 중 오류가 발생했습니다: {e}")
     
     def _clean_value(self, value):
-        """데이터베이스 값에서 UTF-8 인코딩 문제와 Decimal 타입을 해결합니다."""
+        """데이터베이스 값에서 UTF-8 인코딩 문제와 다양한 데이터 타입을 해결합니다."""
         if value is None:
             return None
         
         try:
+            # 날짜/시간 타입을 문자열로 변환 (JSON 직렬화를 위해)
+            import datetime
+            if isinstance(value, (datetime.date, datetime.datetime)):
+                return value.isoformat()
+            
             # Decimal 타입을 float로 변환
             from decimal import Decimal
             if isinstance(value, Decimal):
                 return float(value)
-            elif isinstance(value, bytes):
-                # 바이너리 데이터를 16진수 문자열로 변환
+            
+            # 바이너리 데이터를 16진수 문자열로 변환
+            if isinstance(value, bytes):
                 return value.hex()
-            elif isinstance(value, str):
-                # 문자열에서 문제 있는 문자 제거
+            
+            # MySQL/PostgreSQL/Oracle 특수 타입 처리
+            # UUID 타입을 문자열로 변환
+            if hasattr(value, '__class__') and 'uuid' in str(value.__class__).lower():
+                return str(value)
+            
+            # JSON 타입을 딕셔너리로 변환 (PostgreSQL JSONB 등)
+            if hasattr(value, '__class__') and 'json' in str(value.__class__).lower():
+                try:
+                    return value if isinstance(value, (dict, list)) else str(value)
+                except:
+                    return str(value)
+            
+            # Oracle 특수 타입 처리
+            if hasattr(value, '__class__') and 'oracle' in str(value.__class__).lower():
+                return str(value)
+            
+            # MySQL 특수 타입 처리
+            if hasattr(value, '__class__') and 'mysql' in str(value.__class__).lower():
+                return str(value)
+            
+            # 문자열에서 문제 있는 문자 제거
+            if isinstance(value, str):
                 cleaned = value.encode('utf-8', errors='ignore').decode('utf-8')
                 # 제어 문자 제거
                 import re
                 cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', cleaned)
                 return cleaned
-            else:
-                # 다른 타입은 그대로 반환 (숫자, 날짜 등)
-                return value
+            
+            # 다른 타입은 그대로 반환 (숫자, 리스트, 딕셔너리 등)
+            return value
+            
         except Exception as e:
             logger.warning(f"값 정리 중 오류: {e}, 원본 값: {value}")
             # 오류 발생 시 안전한 문자열로 변환
@@ -395,10 +423,10 @@ class PostgreSQLProvider(DatabaseProvider):
             # 컬럼 정보 조회
             query = f"""
             SELECT 
-                column_name,
-                data_type,
-                is_nullable,
-                column_default,
+                cols.column_name,
+                cols.data_type,
+                cols.is_nullable,
+                cols.column_default,
                 CASE 
                     WHEN pk.column_name IS NOT NULL THEN 'PRI'
                     ELSE ''

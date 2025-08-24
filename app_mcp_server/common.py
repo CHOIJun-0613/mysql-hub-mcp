@@ -95,9 +95,38 @@ def init_environment(db_manager, ai_manager):
         raise
 
 
-def convert_decimal_in_result(obj):
-    """결과 데이터에서 Decimal 타입을 float로, date 타입을 문자열로 변환"""
+def convert_for_json_serialization(obj):
+    """JSON 직렬화를 위해 모든 데이터 타입을 변환"""
+    if obj is None:
+        return None
+    
+    # 날짜/시간 타입을 문자열로 변환
+    import datetime
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    
+    # Decimal 타입을 float로 변환
     from decimal import Decimal
+    if isinstance(obj, Decimal):
+        return float(obj)
+    
+    # 바이너리 데이터를 16진수 문자열로 변환
+    if isinstance(obj, bytes):
+        return obj.hex()
+    
+    # 딕셔너리와 리스트는 재귀적으로 처리
+    elif isinstance(obj, dict):
+        return {k: convert_for_json_serialization(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_for_json_serialization(item) for item in obj]
+    
+    # 다른 타입은 그대로 반환
+    else:
+        return obj
+
+def convert_decimal_in_result(obj):
+    """결과 데이터에서 Decimal 타입을 float로, date 타입을 문자열로 변환 (기존 호환성 유지)"""
+    return convert_for_json_serialization(obj)
     import datetime
     
     if isinstance(obj, Decimal):
@@ -138,25 +167,13 @@ def json_to_pretty_string(data):
     """
     try:
         import json
-        from decimal import Decimal
-        
-        def convert_decimal(obj):
-            """Decimal 타입을 float로 변환하는 헬퍼 함수"""
-            if isinstance(obj, Decimal):
-                return float(obj)
-            elif isinstance(obj, dict):
-                return {k: convert_decimal(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_decimal(item) for item in obj]
-            else:
-                return obj
         
         # Response 객체인 경우 model_dump() 사용
         if hasattr(data, 'model_dump'):
             data = data.model_dump()
         
-        # Decimal 타입을 float로 변환
-        converted_data = convert_decimal(data)
+        # 공통 변환 함수를 사용하여 모든 데이터 타입 변환
+        converted_data = convert_for_json_serialization(data)
         
         return json.dumps(converted_data, ensure_ascii=False, indent=2, sort_keys=True)
     except Exception as e:

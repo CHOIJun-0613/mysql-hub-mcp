@@ -17,7 +17,7 @@ from database import db_manager
 from ai_provider import ai_manager
 from ai_worker import natural_language_query_work,make_system_prompt, strip_markdown_sql
 from config import config
-from common import clear_screen, init_environment, json_to_pretty_string, convert_decimal_in_result
+from common import clear_screen, init_environment, json_to_pretty_string, convert_for_json_serialization
 
 logger = logging.getLogger(__name__)
 host = config.MCP_SERVER_HOST
@@ -131,10 +131,8 @@ async def execute_sql(sql: str) -> Dict[str, Any]:
         # 데이터베이스 매니저에서 SQL 실행 메서드 호출
         result = db_manager.execute_query(sql)
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        
-        # 결과 데이터에서 Decimal 타입 변환
-        converted_result = convert_decimal_in_result(result)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_result = convert_for_json_serialization(result)
         
         result = {"data": converted_result, "row_count": len(converted_result), "sql": sql, "status": "success"}
         logger.info(f"🚨=====[MCP] SQL 실행 결과: \n{json_to_pretty_string(result)}\n")
@@ -162,10 +160,8 @@ async def natural_language_query(question: str) -> Dict[str, Any]:
 
         response = await natural_language_query_work(question, False)
         
-        # Decimal 타입을 float로 변환하여 JSON 직렬화 문제 방지
-        
-        # 응답 데이터에서 Decimal 타입 변환
-        converted_data = convert_decimal_in_result(response.data)
+        # JSON 직렬화를 위해 데이터 타입 변환
+        converted_data = convert_for_json_serialization(response.data)
         
         result = {"data": converted_data, "row_count": len(converted_data), "sql": converted_data.get("sql_query", ""), "status": "success"}
         logger.info(f"🚨=====[MCP] 자연어 쿼리 처리 결과 완료: \n{json_to_pretty_string(result)}\n")

@@ -1,7 +1,7 @@
 ---
 alwaysApply: false
 ---
-# MySQL Hub MCP 사용 규칙
+# DB Hub MCP 사용 규칙
 
 ## 쿼리 결과 표시
 - 결과 데이터가 1건 이상 있는 경우는 항상 표형태로 보여줄 것
@@ -9,7 +9,7 @@ alwaysApply: false
 ## SQL 쿼리 실행 우선순위
 
 ### 1단계: 직접 SQL 작성 (권장)
-- `mysql-hub-mcp`를 사용할 때는 즉시 `natural_language_query()`를 호출하지 않음
+- `db-hub-mcp`를 사용할 때는 즉시 `natural_language_query()`를 호출하지 않음
 - 다음 순서로 진행:
   1. `get_database_info()` - 데이터베이스 정보 확인
   2. `get_table_list()` - 테이블 목록 확인
